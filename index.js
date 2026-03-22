@@ -1,9 +1,13 @@
 import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { Telegraf, Markup, session } from 'telegraf';
 import {
     initMenu,
     getMenu,
-    getMenuArray,
     getMenuItem,
     getCategories,
     getItemsByCategory,
@@ -28,6 +32,16 @@ const ADMIN_CHAT_ID = String(process.env.ADMIN_CHAT_ID || '');
 const TIME_ZONE = 'Asia/Tashkent';
 const WORK_START = process.env.WORK_START || '09:00';
 const WORK_END = process.env.WORK_END || '23:00';
+const PORT = Number(process.env.PORT || 10000);
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const MENU_FILE = path.join(__dirname, 'menu.json');
+const ORDERS_FILE = path.join(__dirname, 'orders.json');
 
 bot.use(
     session({
@@ -62,9 +76,7 @@ function getNowParts() {
     })
     .formatToParts(new Date())
     .reduce((acc, part) => {
-        if (part.type !== 'literal') {
-            acc[part.type] = part.value;
-        }
+        if (part.type !== 'literal') acc[part.type] = part.value;
         return acc;
     }, {});
     
@@ -129,22 +141,17 @@ function getCartTotal(cart) {
 function getCartText(cart) {
     const items = getCartItems(cart);
     
-    if (!items.length) {
-        return '🛒 Savat bo‘sh.';
-    }
+    if (!items.length) return '🛒 Savat bo‘sh.';
     
     let text = '🛒 Savat:\n\n';
-    
     for (const item of items) {
         text += `${item.name} x ${item.qty} = ${formatPrice(item.total)}\n`;
     }
-    
     return text;
 }
 
 function getCartButtons(cart) {
     const total = getCartTotal(cart);
-    
     if (total === 0) return undefined;
     
     const rows = [
@@ -208,11 +215,8 @@ function buildAdminText(order) {
 
 function clearUnavailableCartItems(cart) {
     const menu = getMenu();
-    
     for (const key of Object.keys(cart)) {
-        if (!menu[key] || !menu[key].active) {
-            delete cart[key];
-        }
+        if (!menu[key] || !menu[key].active) delete cart[key];
     }
 }
 
@@ -220,9 +224,7 @@ function parseAddOrEditCommand(text, command) {
     const rest = text.replace(command, '').trim();
     const parts = rest.split('|').map((part) => part.trim());
     
-    if (parts.length !== 5) {
-        return null;
-    }
+    if (parts.length !== 5) return null;
     
     const [rawKey, name, rawPrice, category, image] = parts;
     const key = normalizeKey(rawKey);
@@ -243,26 +245,19 @@ function parseAddOrEditCommand(text, command) {
 
 function getCategoryKeyboard() {
     const categories = getCategories({ activeOnly: true });
-    
-    if (!categories.length) {
-        return undefined;
-    }
+    if (!categories.length) return undefined;
     
     const rows = categories.map((category) => [
         Markup.button.callback(category, `cat_${encodeURIComponent(category)}`)
     ]);
     
     rows.push([Markup.button.callback('🛒 Savatni ko‘rish', 'open_cart')]);
-    
     return Markup.inlineKeyboard(rows);
 }
 
 function getCategoryText() {
     const categories = getCategories({ activeOnly: true });
-    
-    if (!categories.length) {
-        return '📭 Hozircha aktiv mahsulot yo‘q.';
-    }
+    if (!categories.length) return '📭 Hozircha aktiv mahsulot yo‘q.';
     
     return [
         '📂 Kategoriyani tanlang:',
@@ -277,9 +272,7 @@ function getCategoryProductsText(category, cart) {
     const items = getItemsByCategory(category, { activeOnly: true });
     const total = getCartTotal(cart);
     
-    if (!items.length) {
-        return `📭 ${category} kategoriyasida mahsulot yo‘q.`;
-    }
+    if (!items.length) return `📭 ${category} kategoriyasida mahsulot yo‘q.`;
     
     return [
         `📂 Kategoriya: ${category}`,
@@ -306,13 +299,8 @@ function getCategoryProductsKeyboard(category, cart) {
         ]);
     }
     
-    rows.push([
-        Markup.button.callback('⬅️ Kategoriyalarga qaytish', 'back_to_categories')
-    ]);
-    
-    rows.push([
-        Markup.button.callback('🛒 Savatni ko‘rish', 'open_cart')
-    ]);
+    rows.push([Markup.button.callback('⬅️ Kategoriyalarga qaytish', 'back_to_categories')]);
+    rows.push([Markup.button.callback('🛒 Savatni ko‘rish', 'open_cart')]);
     
     return Markup.inlineKeyboard(rows);
 }
@@ -321,24 +309,50 @@ async function renderCategories(ctx, edit = false) {
     const text = getCategoryText();
     const keyboard = getCategoryKeyboard();
     
-    if (edit) {
-        return ctx.editMessageText(text, keyboard);
-    }
-    
+    if (edit) return ctx.editMessageText(text, keyboard);
     return ctx.reply(text, keyboard);
 }
 
 async function renderCategoryProducts(ctx, category, edit = false) {
     ctx.session.currentCategory = category;
-    
     const text = getCategoryProductsText(category, ctx.session.cart);
     const keyboard = getCategoryProductsKeyboard(category, ctx.session.cart);
     
-    if (edit) {
-        return ctx.editMessageText(text, keyboard);
-    }
-    
+    if (edit) return ctx.editMessageText(text, keyboard);
     return ctx.reply(text, keyboard);
+}
+
+async function readJson(filePath, fallback) {
+    try {
+        const raw = await fs.readFile(filePath, 'utf-8');
+        return JSON.parse(raw);
+    } catch {
+        await fs.writeFile(filePath, JSON.stringify(fallback, null, 2), 'utf-8');
+        return fallback;
+    }
+}
+
+async function writeJson(filePath, data) {
+    await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
+}
+
+async function sendTelegramMessage(chatId, text) {
+    if (!process.env.BOT_TOKEN || !chatId) return;
+    
+    try {
+        const response = await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, text })
+        });
+        
+        const data = await response.json();
+        if (!data.ok) {
+            console.log('Telegram API xato:', data.description);
+        }
+    } catch (error) {
+        console.log('Telegramga xabar yuborishda xato:', error.message);
+    }
 }
 
 bot.on('message', async (ctx, next) => {
@@ -354,10 +368,7 @@ bot.start((ctx) => {
     ctx.session.orderData = {};
     ctx.session.currentCategory = null;
     
-    return ctx.reply(
-        'Assalomu alaykum! Restoran botga xush kelibsiz.',
-        mainKeyboard
-    );
+    return ctx.reply('Assalomu alaykum! Restoran botga xush kelibsiz.', mainKeyboard);
 });
 
 bot.command('list', async (ctx) => {
@@ -369,7 +380,6 @@ bot.command('add', async (ctx) => {
     if (!isAdminChat(ctx)) return;
     
     const parsed = parseAddOrEditCommand(ctx.message.text, '/add');
-    
     if (!parsed) {
         return ctx.reply(
             'Format noto‘g‘ri.\n\n/add key|Nomi|Narx|Kategoriya|ImageURL\n\nMasalan:\n/add hotdog|Hot Dog|18000|Fast Food|https://site.com/hotdog.jpg\n\nAgar rasm bo‘lmasa oxiriga - yoz:\n/add hotdog|Hot Dog|18000|Fast Food|-'
@@ -378,9 +388,7 @@ bot.command('add', async (ctx) => {
     
     try {
         await addMenuItem(parsed.key, parsed.name, parsed.price, parsed.category, parsed.image);
-        return ctx.reply(
-            `✅ Qo‘shildi:\n${parsed.name} — ${formatPrice(parsed.price)}\ncategory: ${parsed.category}\nkey: ${parsed.key}`
-        );
+        return ctx.reply(`✅ Qo‘shildi:\n${parsed.name} — ${formatPrice(parsed.price)}\ncategory: ${parsed.category}\nkey: ${parsed.key}`);
     } catch (error) {
         return ctx.reply(`❌ ${error.message}`);
     }
@@ -390,7 +398,6 @@ bot.command('edit', async (ctx) => {
     if (!isAdminChat(ctx)) return;
     
     const parsed = parseAddOrEditCommand(ctx.message.text, '/edit');
-    
     if (!parsed) {
         return ctx.reply(
             'Format noto‘g‘ri.\n\n/edit key|Yangi Nomi|Yangi Narx|Kategoriya|ImageURL\n\nMasalan:\n/edit hotdog|Hot Dog Big|22000|Fast Food|https://site.com/hotdog2.jpg'
@@ -399,9 +406,7 @@ bot.command('edit', async (ctx) => {
     
     try {
         await editMenuItem(parsed.key, parsed.name, parsed.price, parsed.category, parsed.image);
-        return ctx.reply(
-            `✅ Yangilandi:\n${parsed.name} — ${formatPrice(parsed.price)}\ncategory: ${parsed.category}\nkey: ${parsed.key}`
-        );
+        return ctx.reply(`✅ Yangilandi:\n${parsed.name} — ${formatPrice(parsed.price)}\ncategory: ${parsed.category}\nkey: ${parsed.key}`);
     } catch (error) {
         return ctx.reply(`❌ ${error.message}`);
     }
@@ -413,9 +418,7 @@ bot.command('delete', async (ctx) => {
     const rawKey = ctx.message.text.replace('/delete', '').trim();
     const key = normalizeKey(rawKey);
     
-    if (!key) {
-        return ctx.reply('Format: /delete key\n\nMasalan:\n/delete hotdog');
-    }
+    if (!key) return ctx.reply('Format: /delete key\n\nMasalan:\n/delete hotdog');
     
     try {
         const deleted = await deleteMenuItem(key);
@@ -431,9 +434,7 @@ bot.command('hide', async (ctx) => {
     const rawKey = ctx.message.text.replace('/hide', '').trim();
     const key = normalizeKey(rawKey);
     
-    if (!key) {
-        return ctx.reply('Format: /hide key\n\nMasalan:\n/hide cola');
-    }
+    if (!key) return ctx.reply('Format: /hide key\n\nMasalan:\n/hide cola');
     
     try {
         const item = await setMenuItemActive(key, false);
@@ -449,9 +450,7 @@ bot.command('show', async (ctx) => {
     const rawKey = ctx.message.text.replace('/show', '').trim();
     const key = normalizeKey(rawKey);
     
-    if (!key) {
-        return ctx.reply('Format: /show key\n\nMasalan:\n/show cola');
-    }
+    if (!key) return ctx.reply('Format: /show key\n\nMasalan:\n/show cola');
     
     try {
         const item = await setMenuItemActive(key, true);
@@ -499,7 +498,6 @@ bot.action('back_to_categories', async (ctx) => {
 
 bot.action(/^cat_(.+)$/, async (ctx) => {
     await ctx.answerCbQuery();
-    
     const category = decodeURIComponent(ctx.match[1]);
     return renderCategoryProducts(ctx, category, true);
 });
@@ -583,14 +581,9 @@ bot.hears('🛒 Savat', (ctx) => {
     const total = getCartTotal(ctx.session.cart);
     const text = getCartText(ctx.session.cart);
     
-    if (total === 0) {
-        return ctx.reply(text);
-    }
+    if (total === 0) return ctx.reply(text);
     
-    return ctx.reply(
-        `${text}\n💰 Jami: ${formatPrice(total)}`,
-        getCartButtons(ctx.session.cart)
-    );
+    return ctx.reply(`${text}\n💰 Jami: ${formatPrice(total)}`, getCartButtons(ctx.session.cart));
 });
 
 bot.action('open_cart', async (ctx) => {
@@ -600,14 +593,9 @@ bot.action('open_cart', async (ctx) => {
     const total = getCartTotal(ctx.session.cart);
     const text = getCartText(ctx.session.cart);
     
-    if (total === 0) {
-        return ctx.reply(text);
-    }
+    if (total === 0) return ctx.reply(text);
     
-    return ctx.reply(
-        `${text}\n💰 Jami: ${formatPrice(total)}`,
-        getCartButtons(ctx.session.cart)
-    );
+    return ctx.reply(`${text}\n💰 Jami: ${formatPrice(total)}`, getCartButtons(ctx.session.cart));
 });
 
 bot.action('clear_cart', async (ctx) => {
@@ -628,15 +616,10 @@ bot.action('checkout', async (ctx) => {
     
     if (!isRestaurantOpen()) {
         await ctx.answerCbQuery('Hozir yopiqmiz');
-        return ctx.reply(
-            `⛔ Hozir buyurtma qabul qilinmaydi.\n${getWorkHoursText()}`
-        );
+        return ctx.reply(`⛔ Hozir buyurtma qabul qilinmaydi.\n${getWorkHoursText()}`);
     }
     
-    const fullName = [ctx.from.first_name, ctx.from.last_name]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
+    const fullName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim();
     
     ctx.session.orderData = {
         name: fullName || 'Noma’lum',
@@ -648,9 +631,7 @@ bot.action('checkout', async (ctx) => {
     await ctx.answerCbQuery();
     return ctx.reply(
         '📱 Telefon raqamingizni yuboring:\n\nTelegram sizdan tasdiq so‘raydi.',
-        Markup.keyboard([
-            [Markup.button.contactRequest('📱 Telefon yuborish')]
-        ]).resize().oneTime()
+        Markup.keyboard([[Markup.button.contactRequest('📱 Telefon yuborish')]]).resize().oneTime()
     );
 });
 
@@ -662,9 +643,7 @@ bot.on('contact', (ctx) => {
     
     return ctx.reply(
         '📍 Lokatsiyangizni yuboring:',
-        Markup.keyboard([
-            [Markup.button.locationRequest('📍 Lokatsiya yuborish')]
-        ]).resize().oneTime()
+        Markup.keyboard([[Markup.button.locationRequest('📍 Lokatsiya yuborish')]]).resize().oneTime()
     );
 });
 
@@ -726,8 +705,6 @@ bot.on('location', async (ctx) => {
         } catch (error) {
             console.log('Admin ga yuborishda xato:', error.message);
         }
-    } else {
-        console.log('ADMIN_CHAT_ID topilmadi');
     }
     
     ctx.session.cart = {};
@@ -743,7 +720,6 @@ bot.action(/^status_(\d+)_(.+)$/, async (ctx) => {
     const newStatus = ctx.match[2];
     
     const order = getOrderById(orderId);
-    
     if (!order) {
         await ctx.answerCbQuery('Buyurtma topilmadi');
         return;
@@ -755,7 +731,6 @@ bot.action(/^status_(\d+)_(.+)$/, async (ctx) => {
     
     try {
         const nextButtons = getButtonsByStatus(updatedOrder);
-        
         if (nextButtons) {
             await ctx.editMessageText(buildAdminText(updatedOrder), nextButtons);
         } else {
@@ -781,28 +756,166 @@ bot.action(/^status_(\d+)_(.+)$/, async (ctx) => {
     }
 });
 
-bot.hears('☎️ Aloqa', (ctx) => {
-    return ctx.reply(
-        `☎️ Aloqa uchun: +998 90 123 45 67\n${getWorkHoursText()}`,
-        mainKeyboard
+/* API ROUTES */
+app.get('/', (req, res) => {
+    res.send('Bot + API ishlayapti');
+});
+
+app.get('/health', (req, res) => {
+    res.status(200).json({
+        ok: true,
+        service: 'telegram-bot-api',
+        time: new Date().toISOString()
+    });
+});
+
+app.get('/api/menu', async (req, res) => {
+    const menu = await readJson(MENU_FILE, {});
+    res.json(menu);
+});
+
+app.post('/api/menu', async (req, res) => {
+    const menu = await readJson(MENU_FILE, {});
+    const { key, name, price, category, image, active } = req.body;
+    
+    if (!key || !name || !price || !category) {
+        return res.status(400).json({ error: 'key, name, price, category kerak' });
+    }
+    
+    menu[key] = {
+        key,
+        name,
+        price: Number(price),
+        category,
+        image: image || '',
+        active: active ?? true
+    };
+    
+    await writeJson(MENU_FILE, menu);
+    res.json(menu[key]);
+});
+
+app.put('/api/menu/:key', async (req, res) => {
+    const menu = await readJson(MENU_FILE, {});
+    const key = req.params.key;
+    
+    if (!menu[key]) {
+        return res.status(404).json({ error: 'Mahsulot topilmadi' });
+    }
+    
+    const updated = {
+        ...menu[key],
+        ...req.body,
+        key
+    };
+    
+    if (updated.price !== undefined) {
+        updated.price = Number(updated.price);
+    }
+    
+    menu[key] = updated;
+    await writeJson(MENU_FILE, menu);
+    res.json(updated);
+});
+
+app.delete('/api/menu/:key', async (req, res) => {
+    const menu = await readJson(MENU_FILE, {});
+    const key = req.params.key;
+    
+    if (!menu[key]) {
+        return res.status(404).json({ error: 'Mahsulot topilmadi' });
+    }
+    
+    const deleted = menu[key];
+    delete menu[key];
+    await writeJson(MENU_FILE, menu);
+    res.json(deleted);
+});
+
+app.get('/api/orders', async (req, res) => {
+    const orders = await readJson(ORDERS_FILE, []);
+    res.json(orders);
+});
+
+app.put('/api/orders/:id/status', async (req, res) => {
+    const orders = await readJson(ORDERS_FILE, []);
+    const { status } = req.body;
+    const id = req.params.id;
+    
+    const order = orders.find((item) => String(item.id) === String(id));
+    
+    if (!order) {
+        return res.status(404).json({ error: 'Buyurtma topilmadi' });
+    }
+    
+    order.status = status;
+    order.updatedAt = new Date().toISOString();
+    
+    await writeJson(ORDERS_FILE, orders);
+    
+    await sendTelegramMessage(
+        order.chatId,
+        [
+            '📦 Buyurtma holati yangilandi!',
+            '',
+            `🆔 Buyurtma ID: ${order.id}`,
+            `📌 Yangi status: ${order.status}`
+        ].join('\n')
     );
+    
+    res.json(order);
+});
+
+app.get('/api/stats', async (req, res) => {
+    const orders = await readJson(ORDERS_FILE, []);
+    
+    const totalOrders = orders.length;
+    const newOrders = orders.filter((o) => o.status === 'Yangi buyurtma').length;
+    const acceptedOrders = orders.filter((o) => o.status === 'Qabul qilindi').length;
+    const readyOrders = orders.filter((o) => o.status === 'Tayyor').length;
+    const deliveredOrders = orders.filter((o) => o.status === 'Yetkazildi').length;
+    const totalRevenue = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+    
+    res.json({
+        totalOrders,
+        newOrders,
+        acceptedOrders,
+        readyOrders,
+        deliveredOrders,
+        totalRevenue
+    });
+});
+
+bot.hears('☎️ Aloqa', (ctx) => {
+    return ctx.reply(`☎️ Aloqa uchun: +998 90 123 45 67\n${getWorkHoursText()}`, mainKeyboard);
 });
 
 bot.catch((err) => {
     console.error('BOT ERROR:', err);
 });
 
-async function startBot() {
+async function startApp() {
     await initMenu();
     await initOrders();
     
-    bot.launch();
+    await bot.launch();
     console.log('✅ Bot ishga tushdi');
     console.log('ADMIN_CHAT_ID:', ADMIN_CHAT_ID || 'yo‘q');
     console.log('WORK HOURS:', `${WORK_START} - ${WORK_END}`);
+    
+    app.listen(PORT, () => {
+        console.log(`🌐 Server ishladi: ${PORT}`);
+    });
 }
 
-startBot();
+startApp();
 
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+process.once('SIGINT', () => {
+    bot.stop('SIGINT');
+    process.exit(0);
+});
+
+process.once('SIGTERM', () => {
+    bot.stop('SIGTERM');
+    process.exit(0);
+});

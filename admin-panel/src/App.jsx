@@ -20,7 +20,7 @@ import {
   UtensilsCrossed,
 } from 'lucide-react';
 
-const API = 'http://localhost:5000/api';
+const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const statusMap = {
   'Yangi buyurtma': { label: 'Yangi', bg: '#dbeafe', color: '#1d4ed8' },
@@ -225,18 +225,12 @@ function OrderCard({ order, onStatusChange }) {
     <div style={{ display: 'grid', gap: 6 }}>
     {location.hasCoords ? (
       <>
-      <span>
-      {location.lat}, {location.lon}
-      </span>
+      <span>{location.lat}, {location.lon}</span>
       <a
       href={location.link}
       target="_blank"
       rel="noreferrer"
-      style={{
-        color: '#2563eb',
-        textDecoration: 'none',
-        fontWeight: 600,
-      }}
+      style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 600 }}
       >
       Xaritada ochish
       </a>
