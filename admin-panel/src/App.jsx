@@ -30,7 +30,7 @@ const statusMap = {
 };
 
 function formatPrice(value) {
-  return new Intl.NumberFormat('uz-UZ').format(value) + " so'm";
+  return new Intl.NumberFormat('uz-UZ').format(Number(value || 0)) + " so'm";
 }
 
 function Card({ children, style = {} }) {
@@ -315,14 +315,40 @@ function OrderCard({ order, onStatusChange }) {
   );
 }
 
+function buildStatsFromOrders(orders) {
+  const totalOrders = orders.length;
+  const newOrders = orders.filter((o) => o.status === 'Yangi buyurtma').length;
+  const acceptedOrders = orders.filter((o) => o.status === 'Qabul qilindi').length;
+  const readyOrders = orders.filter((o) => o.status === 'Tayyor').length;
+  const deliveredOrders = orders.filter((o) => o.status === 'Yetkazildi').length;
+  const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+  
+  return {
+    totalOrders,
+    newOrders,
+    acceptedOrders,
+    readyOrders,
+    deliveredOrders,
+    totalRevenue,
+  };
+}
+
 export default function App() {
   const [page, setPage] = useState('dashboard');
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
-  const [statsData, setStatsData] = useState(null);
+  const [statsData, setStatsData] = useState({
+    totalOrders: 0,
+    newOrders: 0,
+    acceptedOrders: 0,
+    readyOrders: 0,
+    deliveredOrders: 0,
+    totalRevenue: 0,
+  });
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [streamStatus, setStreamStatus] = useState('Ulanmoqda...');
   const [form, setForm] = useState({
     id: '',
     name: '',
@@ -341,11 +367,16 @@ export default function App() {
       
       const menuData = await menuRes.json();
       const ordersData = await ordersRes.json();
-      const stats = await statsRes.json();
       
       setProducts(Object.values(menuData || {}));
       setOrders(Array.isArray(ordersData) ? ordersData : []);
-      setStatsData(stats || null);
+      
+      try {
+        const stats = await statsRes.json();
+        setStatsData(stats || buildStatsFromOrders(Array.isArray(ordersData) ? ordersData : []));
+      } catch {
+        setStatsData(buildStatsFromOrders(Array.isArray(ordersData) ? ordersData : []));
+      }
     } catch (error) {
       console.error('Ma’lumotlarni yuklashda xato:', error);
     }
@@ -354,11 +385,24 @@ export default function App() {
   useEffect(() => {
     loadData();
     
-    const interval = setInterval(() => {
-      loadData();
-    }, 3000);
+    const streamUrl = `${API.replace(/\/api$/, '')}/api/stream`;
+    const eventSource = new EventSource(streamUrl);
     
-    return () => clearInterval(interval);
+    eventSource.onopen = () => {
+      setStreamStatus('Real-time ulangan');
+    };
+    
+    eventSource.onmessage = () => {
+      loadData();
+    };
+    
+    eventSource.onerror = () => {
+      setStreamStatus('Aloqa uzildi, qayta ulanmoqda...');
+    };
+    
+    return () => {
+      eventSource.close();
+    };
   }, []);
   
   const filteredOrders = useMemo(() => {
@@ -378,7 +422,6 @@ async function handleStatusChange(id, status) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     });
-    
     await loadData();
   } catch (error) {
     console.error('Statusni yangilashda xato:', error);
@@ -524,6 +567,9 @@ return (
   <div style={{ fontSize: 34, fontWeight: 800, color: '#0f172a' }}>Admin Panel</div>
   <div style={{ color: '#64748b', marginTop: 6 }}>
   Buyurtmalar va mahsulotlar real fayllar bilan ishlayapti.
+  </div>
+  <div style={{ color: '#16a34a', marginTop: 6, fontSize: 13 }}>
+  {streamStatus}
   </div>
   </div>
   

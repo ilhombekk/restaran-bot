@@ -43,6 +43,20 @@ const __dirname = path.dirname(__filename);
 const MENU_FILE = path.join(__dirname, 'menu.json');
 const ORDERS_FILE = path.join(__dirname, 'orders.json');
 
+const sseClients = new Set();
+
+function sendSseEvent(type, payload = {}) {
+    const data = `data: ${JSON.stringify({ type, payload, time: new Date().toISOString() })}\n\n`;
+    
+    for (const client of sseClients) {
+        try {
+            client.write(data);
+        } catch (error) {
+            console.log('SSE client xato:', error.message);
+        }
+    }
+}
+
 bot.use(
     session({
         defaultSession: () => ({
@@ -388,6 +402,7 @@ bot.command('add', async (ctx) => {
     
     try {
         await addMenuItem(parsed.key, parsed.name, parsed.price, parsed.category, parsed.image);
+        sendSseEvent('menu_updated');
         return ctx.reply(`✅ Qo‘shildi:\n${parsed.name} — ${formatPrice(parsed.price)}\ncategory: ${parsed.category}\nkey: ${parsed.key}`);
     } catch (error) {
         return ctx.reply(`❌ ${error.message}`);
@@ -406,6 +421,7 @@ bot.command('edit', async (ctx) => {
     
     try {
         await editMenuItem(parsed.key, parsed.name, parsed.price, parsed.category, parsed.image);
+        sendSseEvent('menu_updated');
         return ctx.reply(`✅ Yangilandi:\n${parsed.name} — ${formatPrice(parsed.price)}\ncategory: ${parsed.category}\nkey: ${parsed.key}`);
     } catch (error) {
         return ctx.reply(`❌ ${error.message}`);
@@ -422,6 +438,7 @@ bot.command('delete', async (ctx) => {
     
     try {
         const deleted = await deleteMenuItem(key);
+        sendSseEvent('menu_updated');
         return ctx.reply(`🗑 O‘chirildi:\n${deleted.name}\nkey: ${deleted.key}`);
     } catch (error) {
         return ctx.reply(`❌ ${error.message}`);
@@ -438,6 +455,7 @@ bot.command('hide', async (ctx) => {
     
     try {
         const item = await setMenuItemActive(key, false);
+        sendSseEvent('menu_updated');
         return ctx.reply(`🙈 Yashirildi:\n${item.name}\nkey: ${item.key}`);
     } catch (error) {
         return ctx.reply(`❌ ${error.message}`);
@@ -454,6 +472,7 @@ bot.command('show', async (ctx) => {
     
     try {
         const item = await setMenuItemActive(key, true);
+        sendSseEvent('menu_updated');
         return ctx.reply(`👀 Qayta ochildi:\n${item.name}\nkey: ${item.key}`);
     } catch (error) {
         return ctx.reply(`❌ ${error.message}`);
@@ -582,7 +601,6 @@ bot.hears('🛒 Savat', (ctx) => {
     const text = getCartText(ctx.session.cart);
     
     if (total === 0) return ctx.reply(text);
-    
     return ctx.reply(`${text}\n💰 Jami: ${formatPrice(total)}`, getCartButtons(ctx.session.cart));
 });
 
@@ -594,7 +612,6 @@ bot.action('open_cart', async (ctx) => {
     const text = getCartText(ctx.session.cart);
     
     if (total === 0) return ctx.reply(text);
-    
     return ctx.reply(`${text}\n💰 Jami: ${formatPrice(total)}`, getCartButtons(ctx.session.cart));
 });
 
@@ -678,6 +695,7 @@ bot.on('location', async (ctx) => {
     };
     
     await addOrder(order);
+    sendSseEvent('order_created', order);
     
     const userText = [
         '✅ Buyurtma qabul qilindi!',
@@ -726,6 +744,7 @@ bot.action(/^status_(\d+)_(.+)$/, async (ctx) => {
     }
     
     const updatedOrder = await updateOrderStatus(orderId, newStatus);
+    sendSseEvent('order_updated', updatedOrder);
     
     await ctx.answerCbQuery(`Status: ${newStatus}`);
     
@@ -769,6 +788,30 @@ app.get('/health', (req, res) => {
     });
 });
 
+app.get('/api/stream', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
+    
+    res.write(`data: ${JSON.stringify({ type: 'connected', time: new Date().toISOString() })}\n\n`);
+    
+    sseClients.add(res);
+    
+    const heartbeat = setInterval(() => {
+        try {
+            res.write(`: ping\n\n`);
+        } catch {
+            clearInterval(heartbeat);
+        }
+    }, 25000);
+    
+    req.on('close', () => {
+        clearInterval(heartbeat);
+        sseClients.delete(res);
+    });
+});
+
 app.get('/api/menu', async (req, res) => {
     const menu = await readJson(MENU_FILE, {});
     res.json(menu);
@@ -792,6 +835,7 @@ app.post('/api/menu', async (req, res) => {
     };
     
     await writeJson(MENU_FILE, menu);
+    sendSseEvent('menu_updated');
     res.json(menu[key]);
 });
 
@@ -815,6 +859,7 @@ app.put('/api/menu/:key', async (req, res) => {
     
     menu[key] = updated;
     await writeJson(MENU_FILE, menu);
+    sendSseEvent('menu_updated');
     res.json(updated);
 });
 
@@ -829,6 +874,7 @@ app.delete('/api/menu/:key', async (req, res) => {
     const deleted = menu[key];
     delete menu[key];
     await writeJson(MENU_FILE, menu);
+    sendSseEvent('menu_updated');
     res.json(deleted);
 });
 
@@ -852,6 +898,7 @@ app.put('/api/orders/:id/status', async (req, res) => {
     order.updatedAt = new Date().toISOString();
     
     await writeJson(ORDERS_FILE, orders);
+    sendSseEvent('order_updated', order);
     
     await sendTelegramMessage(
         order.chatId,
