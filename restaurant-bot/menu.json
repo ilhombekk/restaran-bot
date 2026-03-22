@@ -1,0 +1,42 @@
+{
+  "lavash": {
+    "key": "lavash",
+    "name": "Lavash",
+    "price": 28000,
+    "category": "Fast Food",
+    "image": "https://tse4.mm.bing.net/th/id/OIP.pXKc1am5bF0yScbbasFRJgHaFj?rs=1&pid=ImgDetMain&o=7&rm=3",
+    "active": true
+  },
+  "burger": {
+    "key": "burger",
+    "name": "Burger",
+    "price": 32000,
+    "category": "Fast Food",
+    "image": "",
+    "active": true
+  },
+  "pizza": {
+    "key": "pizza",
+    "name": "Pizza",
+    "price": 65000,
+    "category": "Pizza",
+    "image": "",
+    "active": true
+  },
+  "cola": {
+    "key": "cola",
+    "name": "Coca-Cola 1L",
+    "price": 12000,
+    "category": "Ichimliklar",
+    "image": "",
+    "active": true
+  },
+  "hotdog": {
+    "key": "hotdog",
+    "name": "Hot Dog Big",
+    "price": 22000,
+    "category": "Fast Food",
+    "image": "https://healthywayrecipes.com/wp-content/uploads/2025/01/Classic-Pepperonis-Pizza-Fresh-from-the-Oven.png",
+    "active": true
+  }
+}

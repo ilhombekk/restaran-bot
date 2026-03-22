@@ -1,0 +1,20 @@
+{
+  "name": "restaurant-bot",
+  "version": "1.0.0",
+  "description": "Telegram restoran bot + API server",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "server": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "telegraf": "^4.16.3"
+  }
+}

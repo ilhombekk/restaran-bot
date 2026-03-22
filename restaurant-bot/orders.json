@@ -1,0 +1,152 @@
+[
+  {
+    "id": "086869",
+    "name": "Saidov",
+    "phone": "998884832500",
+    "username": "learnncode",
+    "telegramName": "Saidov",
+    "userId": 447471345,
+    "chatId": 447471345,
+    "location": {
+      "lat": 41.653243,
+      "lon": 60.286213
+    },
+    "cart": {
+      "burger": 1,
+      "lavash": 1
+    },
+    "cartText": "🛒 Savat:\n\nBurger x 1 = 32 000 so'm\nLavash x 1 = 28 000 so'm\n",
+    "total": 60000,
+    "status": "Yetkazildi",
+    "createdAt": "2026-03-21T20:14:46.869Z",
+    "updatedAt": "2026-03-21T20:15:13.689Z"
+  },
+  {
+    "id": "542285",
+    "name": "Saidov",
+    "phone": "998884832500",
+    "username": "learnncode",
+    "telegramName": "Saidov",
+    "userId": 447471345,
+    "chatId": 447471345,
+    "location": {
+      "lat": 41.653243,
+      "lon": 60.286213
+    },
+    "cart": {
+      "hotdog": 1,
+      "burger": 1
+    },
+    "cartText": "🛒 Savat:\n\nHot Dog Big x 1 = 22 000 so'm\nBurger x 1 = 32 000 so'm\n",
+    "total": 54000,
+    "status": "Qabul qilindi",
+    "createdAt": "2026-03-21T20:05:42.285Z",
+    "updatedAt": "2026-03-21T20:09:52.426Z"
+  },
+  {
+    "id": "014078",
+    "name": "Saidov",
+    "phone": "998884832500",
+    "username": "learnncode",
+    "telegramName": "Saidov",
+    "userId": 447471345,
+    "chatId": 447471345,
+    "location": {
+      "lat": 41.653243,
+      "lon": 60.286213
+    },
+    "cart": {
+      "pizza": 1
+    },
+    "cartText": "🛒 Savat:\n\nPizza x 1 = 65 000 so'm\n",
+    "total": 65000,
+    "status": "Yetkazildi",
+    "createdAt": "2026-03-21T19:56:54.078Z",
+    "updatedAt": "2026-03-21T19:57:12.967Z"
+  },
+  {
+    "id": "170172",
+    "name": "Saidov",
+    "phone": "998884832500",
+    "username": "learnncode",
+    "telegramName": "Saidov",
+    "userId": 447471345,
+    "chatId": 447471345,
+    "location": {
+      "lat": 41.653243,
+      "lon": 60.286213
+    },
+    "cart": {
+      "lavash": 1,
+      "burger": 1
+    },
+    "cartText": "🛒 Savat:\n\nLavash x 1 = 28 000 so'm\nBurger x 1 = 32 000 so'm\n",
+    "total": 60000,
+    "status": "Yetkazildi",
+    "createdAt": "2026-03-21T19:42:50.172Z",
+    "updatedAt": "2026-03-21T19:57:17.121Z"
+  },
+  {
+    "id": "704059",
+    "name": "amino_vaaa",
+    "phone": "998886022110",
+    "username": "",
+    "telegramName": "amino_vaaa",
+    "userId": 7781063767,
+    "chatId": 7781063767,
+    "location": {
+      "lat": 41.642807,
+      "lon": 60.288262
+    },
+    "cart": {
+      "hotdog": 1
+    },
+    "cartText": "🛒 Savat:\n\nHot Dog Big x 1 = 22 000 so'm\n",
+    "total": 22000,
+    "status": "Yetkazildi",
+    "createdAt": "2026-03-21T19:01:44.059Z",
+    "updatedAt": "2026-03-21T19:02:49.516Z"
+  },
+  {
+    "id": "349071",
+    "name": "Saidov",
+    "phone": "+998884832500",
+    "username": "learnncode",
+    "telegramName": "Saidov",
+    "userId": 447471345,
+    "chatId": 447471345,
+    "location": {
+      "lat": 41.653243,
+      "lon": 60.286213
+    },
+    "cart": {
+      "hotdog": 1
+    },
+    "cartText": "🛒 Savat:\n\nHot Dog Big x 1 = 22 000 so'm\n",
+    "total": 22000,
+    "status": "Yetkazildi",
+    "createdAt": "2026-03-21T18:55:49.072Z",
+    "updatedAt": "2026-03-21T19:38:15.256Z"
+  },
+  {
+    "id": "971807",
+    "name": "Saidov",
+    "phone": "998884832500",
+    "username": "learnncode",
+    "telegramName": "Saidov",
+    "userId": 447471345,
+    "chatId": 447471345,
+    "location": {
+      "lat": 41.653243,
+      "lon": 60.286213
+    },
+    "cart": {
+      "pizza": 1
+    },
+    "cartText": "🛒 Savat:\n\nPizza x 1 = 65 000 so'm\n",
+    "total": 65000,
+    "status": "Yetkazildi",
+    "createdAt": "2026-03-21T18:49:31.807Z",
+    "updatedAt": "2026-03-21T18:50:00.989Z"
+  }
+]
