@@ -78,7 +78,7 @@ function isAdminChat(ctx) {
 }
 
 function formatPrice(price) {
-    return new Intl.NumberFormat('uz-UZ').format(price) + " so'm";
+    return new Intl.NumberFormat('uz-UZ').format(Number(price || 0)) + " so'm";
 }
 
 function getNowParts() {
@@ -102,16 +102,25 @@ function getNowParts() {
 
 function timeToMinutes(value) {
     const [h, m] = String(value).split(':').map(Number);
-    return (h * 60) + m;
+    return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+}
+
+function getCurrentTimeText() {
+    const now = getNowParts();
+    return `${String(now.hour).padStart(2, '0')}:${String(now.minute).padStart(2, '0')}`;
 }
 
 function isRestaurantOpen() {
     const now = getNowParts();
-    const nowMinutes = (now.hour * 60) + now.minute;
+    const nowMinutes = now.hour * 60 + now.minute;
     const startMinutes = timeToMinutes(WORK_START);
     const endMinutes = timeToMinutes(WORK_END);
     
-    if (startMinutes <= endMinutes) {
+    if (startMinutes === endMinutes) {
+        return true;
+    }
+    
+    if (endMinutes > startMinutes) {
         return nowMinutes >= startMinutes && nowMinutes < endMinutes;
     }
     
@@ -120,6 +129,14 @@ function isRestaurantOpen() {
 
 function getWorkHoursText() {
     return `🕒 Ish vaqti: ${WORK_START} - ${WORK_END}`;
+}
+
+function getClosedText() {
+    return [
+        '⛔ Hozir buyurtma qabul qilinmaydi.',
+        getWorkHoursText(),
+        `🕐 Hozirgi vaqt: ${getCurrentTimeText()}`
+    ].join('\n');
 }
 
 function getQty(cart, key) {
@@ -499,7 +516,8 @@ bot.command('stats', async (ctx) => {
         '',
         `📦 Umumiy buyurtmalar soni: ${allOrders.length}`,
         '',
-        getWorkHoursText()
+        getWorkHoursText(),
+        `🕐 Hozirgi vaqt: ${getCurrentTimeText()}`
     ].join('\n'));
 });
 
@@ -633,7 +651,7 @@ bot.action('checkout', async (ctx) => {
     
     if (!isRestaurantOpen()) {
         await ctx.answerCbQuery('Hozir yopiqmiz');
-        return ctx.reply(`⛔ Hozir buyurtma qabul qilinmaydi.\n${getWorkHoursText()}`);
+        return ctx.reply(getClosedText(), mainKeyboard);
     }
     
     const fullName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim();
@@ -784,7 +802,11 @@ app.get('/health', (req, res) => {
     res.status(200).json({
         ok: true,
         service: 'telegram-bot-api',
-        time: new Date().toISOString()
+        time: new Date().toISOString(),
+        workStart: WORK_START,
+        workEnd: WORK_END,
+        currentTime: getCurrentTimeText(),
+        isOpen: isRestaurantOpen()
     });
 });
 
@@ -949,6 +971,8 @@ async function startApp() {
     console.log('✅ Bot ishga tushdi');
     console.log('ADMIN_CHAT_ID:', ADMIN_CHAT_ID || 'yo‘q');
     console.log('WORK HOURS:', `${WORK_START} - ${WORK_END}`);
+    console.log('CURRENT TIME:', getCurrentTimeText());
+    console.log('IS OPEN:', isRestaurantOpen());
     
     app.listen(PORT, () => {
         console.log(`🌐 Server ishladi: ${PORT}`);
