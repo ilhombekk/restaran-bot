@@ -967,16 +967,20 @@ async function startApp() {
     await initMenu();
     await initOrders();
     
-    await bot.launch();
-    console.log('✅ Bot ishga tushdi');
-    console.log('ADMIN_CHAT_ID:', ADMIN_CHAT_ID || 'yo‘q');
-    console.log('WORK HOURS:', `${WORK_START} - ${WORK_END}`);
-    console.log('CURRENT TIME:', getCurrentTimeText());
-    console.log('IS OPEN:', isRestaurantOpen());
-    
     app.listen(PORT, () => {
         console.log(`🌐 Server ishladi: ${PORT}`);
     });
+    
+    try {
+        await bot.launch();
+        console.log('✅ Bot ishga tushdi');
+        console.log('ADMIN_CHAT_ID:', ADMIN_CHAT_ID || 'yo‘q');
+        console.log('WORK HOURS:', `${WORK_START} - ${WORK_END}`);
+        console.log('CURRENT TIME:', getCurrentTimeText());
+        console.log('IS OPEN:', isRestaurantOpen());
+    } catch (error) {
+        console.error('BOT LAUNCH ERROR:', error);
+    }
 }
 
 startApp();
