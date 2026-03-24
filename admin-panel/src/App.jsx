@@ -18,9 +18,12 @@ import {
   PowerOff,
   Bell,
   UtensilsCrossed,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const ORDERS_PER_PAGE = 10;
 
 const statusMap = {
   'Yangi buyurtma': { label: 'Yangi', bg: '#dbeafe', color: '#1d4ed8' },
@@ -333,6 +336,76 @@ function buildStatsFromOrders(orders) {
   };
 }
 
+function Pagination({ currentPage, totalPages, onPageChange }) {
+  if (totalPages <= 1) return null;
+  
+  const pages = [];
+  const start = Math.max(1, currentPage - 2);
+  const end = Math.min(totalPages, currentPage + 2);
+  
+  for (let i = start; i <= end; i += 1) {
+    pages.push(i);
+  }
+  
+  return (
+    <div
+    style={{
+      display: 'flex',
+      gap: 10,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: 20,
+      flexWrap: 'wrap',
+    }}
+    >
+    <Button
+    onClick={() => onPageChange(currentPage - 1)}
+    disabled={currentPage === 1}
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6,
+    }}
+    >
+    <ChevronLeft size={16} />
+    Oldingi
+    </Button>
+    
+    {pages.map((page) => (
+      <button
+      key={page}
+      onClick={() => onPageChange(page)}
+      style={{
+        minWidth: 44,
+        height: 44,
+        borderRadius: 14,
+        border: page === currentPage ? 'none' : '1px solid #cbd5e1',
+        background: page === currentPage ? '#0f172a' : '#fff',
+        color: page === currentPage ? '#fff' : '#0f172a',
+        cursor: 'pointer',
+        fontWeight: 700,
+      }}
+      >
+      {page}
+      </button>
+    ))}
+    
+    <Button
+    onClick={() => onPageChange(currentPage + 1)}
+    disabled={currentPage === totalPages}
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6,
+    }}
+    >
+    Keyingi
+    <ChevronRight size={16} />
+    </Button>
+    </div>
+  );
+}
+
 export default function App() {
   const [page, setPage] = useState('dashboard');
   const [orders, setOrders] = useState([]);
@@ -349,6 +422,7 @@ export default function App() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [streamStatus, setStreamStatus] = useState('Ulanmoqda...');
+  const [orderPage, setOrderPage] = useState(1);
   const [form, setForm] = useState({
     id: '',
     name: '',
@@ -412,6 +486,24 @@ export default function App() {
     String(order.phone || '').includes(search)
   );
 }, [orders, search]);
+
+useEffect(() => {
+  setOrderPage(1);
+}, [search]);
+
+const totalOrderPages = Math.max(1, Math.ceil(filteredOrders.length / ORDERS_PER_PAGE));
+
+useEffect(() => {
+  if (orderPage > totalOrderPages) {
+    setOrderPage(totalOrderPages);
+  }
+}, [orderPage, totalOrderPages]);
+
+const paginatedOrders = useMemo(() => {
+  const startIndex = (orderPage - 1) * ORDERS_PER_PAGE;
+  const endIndex = startIndex + ORDERS_PER_PAGE;
+  return filteredOrders.slice(startIndex, endIndex);
+}, [filteredOrders, orderPage]);
 
 const categories = [...new Set(products.map((p) => p.category).filter(Boolean))];
 
@@ -604,12 +696,30 @@ return (
   
   {page === 'orders' && (
     <Card>
-    <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16 }}>Buyurtmalar</div>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 16 }}>
+    <div style={{ fontSize: 22, fontWeight: 800 }}>Buyurtmalar</div>
+    <div style={{ color: '#64748b', fontSize: 14 }}>
+    Har sahifada {ORDERS_PER_PAGE} ta buyurtma
+    </div>
+    </div>
+    
     <div style={{ display: 'grid', gap: 16 }}>
-    {filteredOrders.map((order) => (
+    {paginatedOrders.map((order) => (
       <OrderCard key={order.id} order={order} onStatusChange={handleStatusChange} />
     ))}
     </div>
+    
+    {filteredOrders.length === 0 && (
+      <div style={{ textAlign: 'center', padding: '30px 0', color: '#64748b' }}>
+      Buyurtma topilmadi
+      </div>
+    )}
+    
+    <Pagination
+    currentPage={orderPage}
+    totalPages={totalOrderPages}
+    onPageChange={setOrderPage}
+    />
     </Card>
   )}
   
