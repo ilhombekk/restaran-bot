@@ -40,7 +40,6 @@ app.use(express.json());
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const MENU_FILE = path.join(__dirname, 'menu.json');
 const ORDERS_FILE = path.join(__dirname, 'orders.json');
 
 const sseClients = new Set();
@@ -835,69 +834,70 @@ app.get('/api/stream', (req, res) => {
 });
 
 app.get('/api/menu', async (req, res) => {
-    const menu = await readJson(MENU_FILE, {});
-    res.json(menu);
+    res.json(getMenu());
 });
 
 app.post('/api/menu', async (req, res) => {
-    const menu = await readJson(MENU_FILE, {});
-    const { key, name, price, category, image, active } = req.body;
+    const { key, name, price, category, image } = req.body;
     
     if (!key || !name || !price || !category) {
         return res.status(400).json({ error: 'key, name, price, category kerak' });
     }
     
-    menu[key] = {
-        key,
-        name,
-        price: Number(price),
-        category,
-        image: image || '',
-        active: active ?? true
-    };
-    
-    await writeJson(MENU_FILE, menu);
-    sendSseEvent('menu_updated');
-    res.json(menu[key]);
+    try {
+        await addMenuItem(key, name, Number(price), category, image || '');
+        const item = getMenuItem(normalizeKey(key));
+        sendSseEvent('menu_updated');
+        res.json(item);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
 });
 
 app.put('/api/menu/:key', async (req, res) => {
-    const menu = await readJson(MENU_FILE, {});
-    const key = req.params.key;
+    const key = normalizeKey(req.params.key);
+    const oldItem = getMenuItem(key);
     
-    if (!menu[key]) {
+    if (!oldItem) {
         return res.status(404).json({ error: 'Mahsulot topilmadi' });
     }
     
-    const updated = {
-        ...menu[key],
-        ...req.body,
-        key
-    };
-    
-    if (updated.price !== undefined) {
-        updated.price = Number(updated.price);
+    try {
+        if (req.body.active !== undefined && Object.keys(req.body).length === 1) {
+            const item = await setMenuItemActive(key, Boolean(req.body.active));
+            sendSseEvent('menu_updated');
+            return res.json(item);
+        }
+        
+        const name = req.body.name ?? oldItem.name;
+        const price = req.body.price !== undefined ? Number(req.body.price) : oldItem.price;
+        const category = req.body.category ?? oldItem.category;
+        const image = req.body.image !== undefined ? req.body.image : oldItem.image;
+        
+        await editMenuItem(key, name, price, category, image);
+        const updated = getMenuItem(key);
+        
+        if (req.body.active !== undefined) {
+            await setMenuItemActive(key, Boolean(req.body.active));
+        }
+        
+        sendSseEvent('menu_updated');
+        return res.json(getMenuItem(key) || updated);
+    } catch (error) {
+        return res.status(400).json({ error: error.message });
     }
-    
-    menu[key] = updated;
-    await writeJson(MENU_FILE, menu);
-    sendSseEvent('menu_updated');
-    res.json(updated);
 });
 
 app.delete('/api/menu/:key', async (req, res) => {
-    const menu = await readJson(MENU_FILE, {});
-    const key = req.params.key;
+    const key = normalizeKey(req.params.key);
     
-    if (!menu[key]) {
-        return res.status(404).json({ error: 'Mahsulot topilmadi' });
+    try {
+        const deleted = await deleteMenuItem(key);
+        sendSseEvent('menu_updated');
+        res.json(deleted);
+    } catch (error) {
+        res.status(404).json({ error: error.message });
     }
-    
-    const deleted = menu[key];
-    delete menu[key];
-    await writeJson(MENU_FILE, menu);
-    sendSseEvent('menu_updated');
-    res.json(deleted);
 });
 
 app.get('/api/orders', async (req, res) => {
