@@ -1,183 +1,200 @@
-import fs from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { getMenuCollection } from './db.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const MENU_FILE = path.join(__dirname, 'menu.json');
-
-const DEFAULT_MENU = {
-    lavash: {
-        key: 'lavash',
-        name: 'Lavash',
-        price: 28000,
-        category: 'Fast Food',
-        image: '',
-        active: true
-    },
-    burger: {
-        key: 'burger',
-        name: 'Burger',
-        price: 32000,
-        category: 'Fast Food',
-        image: '',
-        active: true
-    },
-    pizza: {
-        key: 'pizza',
-        name: 'Pizza',
-        price: 65000,
-        category: 'Pizza',
-        image: '',
-        active: true
-    },
-    cola: {
-        key: 'cola',
-        name: 'Coca-Cola 1L',
-        price: 12000,
-        category: 'Ichimliklar',
-        image: '',
-        active: true
-    }
-};
-
-let MENU = {};
-
-async function saveMenu() {
-    await fs.writeFile(MENU_FILE, JSON.stringify(MENU, null, 2), 'utf-8');
-}
+let menuCache = {};
 
 export async function initMenu() {
-    try {
-        const raw = await fs.readFile(MENU_FILE, 'utf-8');
-        MENU = JSON.parse(raw);
-        
-        if (!MENU || typeof MENU !== 'object' || Array.isArray(MENU)) {
-            MENU = { ...DEFAULT_MENU };
-            await saveMenu();
-        }
-    } catch {
-        MENU = { ...DEFAULT_MENU };
-        await saveMenu();
+    const collection = await getMenuCollection();
+    const items = await collection.find({}).toArray();
+    
+    menuCache = {};
+    
+    for (const item of items) {
+        menuCache[item.key] = {
+            key: item.key,
+            name: item.name,
+            price: Number(item.price || 0),
+            category: item.category || 'Boshqa',
+            image: item.image || '',
+            active: item.active !== false,
+        };
     }
+    
+    if (Object.keys(menuCache).length === 0) {
+        const seedItems = [
+            {
+                key: 'lavash',
+                name: 'Lavash',
+                price: 28000,
+                category: 'Fast Food',
+                image: '',
+                active: true,
+            },
+            {
+                key: 'burger',
+                name: 'Burger',
+                price: 32000,
+                category: 'Fast Food',
+                image: '',
+                active: true,
+            },
+            {
+                key: 'pizza',
+                name: 'Pizza',
+                price: 65000,
+                category: 'Pizza',
+                image: '',
+                active: true,
+            },
+            {
+                key: 'cola_1l',
+                name: 'Coca-Cola 1L',
+                price: 12000,
+                category: 'Ichimliklar',
+                image: '',
+                active: true,
+            }
+        ];
+        
+        await collection.insertMany(seedItems);
+        
+        for (const item of seedItems) {
+            menuCache[item.key] = item;
+        }
+    }
+    
+    return menuCache;
+}
+
+export function normalizeKey(value) {
+    return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_');
 }
 
 export function getMenu() {
-    return MENU;
+    return menuCache;
 }
 
 export function getMenuArray({ activeOnly = false } = {}) {
-    let items = Object.values(MENU);
-    
-    if (activeOnly) {
-        items = items.filter((item) => item.active);
-    }
-    
-    return items;
+    const items = Object.values(menuCache);
+    return activeOnly ? items.filter((item) => item.active) : items;
 }
 
 export function getMenuItem(key) {
-    return MENU[key] || null;
+    return menuCache[normalizeKey(key)] || null;
 }
 
-export function hasMenuItem(key) {
-    return Boolean(MENU[key]);
-}
-
-export function getCategories({ activeOnly = true } = {}) {
+export function getCategories({ activeOnly = false } = {}) {
     const items = getMenuArray({ activeOnly });
     return [...new Set(items.map((item) => item.category).filter(Boolean))];
 }
 
-export function getItemsByCategory(category, { activeOnly = true } = {}) {
-    const items = getMenuArray({ activeOnly });
-    return items.filter((item) => item.category === category);
+export function getItemsByCategory(category, { activeOnly = false } = {}) {
+    return getMenuArray({ activeOnly }).filter((item) => item.category === category);
 }
 
 export async function addMenuItem(key, name, price, category, image = '') {
-    if (MENU[key]) {
-        throw new Error('Bu key bilan mahsulot allaqachon mavjud.');
+    const normalizedKey = normalizeKey(key);
+    
+    if (menuCache[normalizedKey]) {
+        throw new Error('Bunday key bilan mahsulot mavjud');
     }
     
-    MENU[key] = {
-        key,
-        name,
+    const item = {
+        key: normalizedKey,
+        name: String(name).trim(),
         price: Number(price),
-        category,
-        image,
-        active: true
+        category: String(category).trim(),
+        image: String(image || '').trim(),
+        active: true,
     };
     
-    await saveMenu();
-    return MENU[key];
+    const collection = await getMenuCollection();
+    await collection.insertOne(item);
+    
+    menuCache[normalizedKey] = item;
+    return item;
 }
 
 export async function editMenuItem(key, name, price, category, image = '') {
-    if (!MENU[key]) {
-        throw new Error('Bunday key bilan mahsulot topilmadi.');
+    const normalizedKey = normalizeKey(key);
+    
+    if (!menuCache[normalizedKey]) {
+        throw new Error('Mahsulot topilmadi');
     }
     
-    MENU[key] = {
-        ...MENU[key],
-        key,
-        name,
+    const updated = {
+        ...menuCache[normalizedKey],
+        name: String(name).trim(),
         price: Number(price),
-        category,
-        image
+        category: String(category).trim(),
+        image: String(image || '').trim(),
     };
     
-    await saveMenu();
-    return MENU[key];
+    const collection = await getMenuCollection();
+    await collection.updateOne(
+        { key: normalizedKey },
+        {
+            $set: {
+                name: updated.name,
+                price: updated.price,
+                category: updated.category,
+                image: updated.image,
+            }
+        }
+    );
+    
+    menuCache[normalizedKey] = updated;
+    return updated;
 }
 
 export async function deleteMenuItem(key) {
-    if (!MENU[key]) {
-        throw new Error('Bunday key bilan mahsulot topilmadi.');
+    const normalizedKey = normalizeKey(key);
+    
+    if (!menuCache[normalizedKey]) {
+        throw new Error('Mahsulot topilmadi');
     }
     
-    const deleted = MENU[key];
-    delete MENU[key];
-    await saveMenu();
+    const deleted = menuCache[normalizedKey];
+    
+    const collection = await getMenuCollection();
+    await collection.deleteOne({ key: normalizedKey });
+    
+    delete menuCache[normalizedKey];
     return deleted;
 }
 
 export async function setMenuItemActive(key, active) {
-    if (!MENU[key]) {
-        throw new Error('Bunday key bilan mahsulot topilmadi.');
+    const normalizedKey = normalizeKey(key);
+    
+    if (!menuCache[normalizedKey]) {
+        throw new Error('Mahsulot topilmadi');
     }
     
-    MENU[key].active = Boolean(active);
-    await saveMenu();
-    return MENU[key];
-}
-
-export function normalizeKey(value) {
-    return String(value)
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '_')
-    .replace(/[^a-z0-9_]/g, '');
+    const value = Boolean(active);
+    
+    const collection = await getMenuCollection();
+    await collection.updateOne(
+        { key: normalizedKey },
+        { $set: { active: value } }
+    );
+    
+    menuCache[normalizedKey].active = value;
+    return menuCache[normalizedKey];
 }
 
 export function formatMenuList() {
-    const items = Object.values(MENU);
+    const items = getMenuArray();
     
     if (!items.length) {
-        return '📭 Menyu bo‘sh.';
+        return 'Mahsulotlar yo‘q';
     }
     
-    const lines = ['📋 Hozirgi menyu:', ''];
-    
-    for (const item of items) {
-        lines.push(
-            `• ${item.name} — ${new Intl.NumberFormat('uz-UZ').format(item.price)} so'm`,
-            `  key: ${item.key}`,
-            `  category: ${item.category}`,
-            `  holat: ${item.active ? 'aktiv' : 'yashirilgan'}`,
-            `  image: ${item.image || 'yo‘q'}`,
-            ''
-        );
-    }
-    
-    return lines.join('\n');
+    return items
+    .map((item, index) => {
+        const status = item.active ? 'aktiv' : 'yashirin';
+        return `${index + 1}. ${item.name} — ${item.price} so'm | ${item.category} | key: ${item.key} | ${status}`;
+    })
+    .join('\n');
 }

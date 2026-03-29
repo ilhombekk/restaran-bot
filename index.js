@@ -1,10 +1,9 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import fs from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { Telegraf, Markup, session } from 'telegraf';
+
+import { connectDb } from './db.js';
 import {
     initMenu,
     getMenu,
@@ -27,25 +26,31 @@ import {
     getAllOrders
 } from './orders.js';
 
-const bot = new Telegraf(process.env.BOT_TOKEN);
+const BOT_TOKEN = process.env.BOT_TOKEN;
 const ADMIN_CHAT_ID = String(process.env.ADMIN_CHAT_ID || '');
 const TIME_ZONE = 'Asia/Tashkent';
 const WORK_START = process.env.WORK_START || '09:00';
 const WORK_END = process.env.WORK_END || '23:00';
 const PORT = Number(process.env.PORT || 10000);
 
+if (!BOT_TOKEN) {
+    throw new Error('BOT_TOKEN topilmadi');
+}
+
+const bot = new Telegraf(BOT_TOKEN);
 const app = express();
+
 app.use(cors());
 app.use(express.json());
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const ORDERS_FILE = path.join(__dirname, 'orders.json');
 
 const sseClients = new Set();
 
 function sendSseEvent(type, payload = {}) {
-    const data = `data: ${JSON.stringify({ type, payload, time: new Date().toISOString() })}\n\n`;
+    const data = `data: ${JSON.stringify({
+        type,
+        payload,
+        time: new Date().toISOString()
+    })}\n\n`;
     
     for (const client of sseClients) {
         try {
@@ -234,7 +239,9 @@ function buildAdminText(order) {
         `🔗 Username: ${order.username ? '@' + order.username : 'yo‘q'}`,
         `🆔 User ID: ${order.userId}`,
         `💬 Chat ID: ${order.chatId}`,
-        `📍 Lokatsiya: https://maps.google.com/?q=${order.location.lat},${order.location.lon}`,
+        order.location?.lat && order.location?.lon
+        ? `📍 Lokatsiya: https://maps.google.com/?q=${order.location.lat},${order.location.lon}`
+        : '📍 Lokatsiya: yo‘q',
         '',
         order.cartText,
         `💰 Jami: ${formatPrice(order.total)}`,
@@ -246,7 +253,9 @@ function buildAdminText(order) {
 function clearUnavailableCartItems(cart) {
     const menu = getMenu();
     for (const key of Object.keys(cart)) {
-        if (!menu[key] || !menu[key].active) delete cart[key];
+        if (!menu[key] || !menu[key].active) {
+            delete cart[key];
+        }
     }
 }
 
@@ -352,25 +361,11 @@ async function renderCategoryProducts(ctx, category, edit = false) {
     return ctx.reply(text, keyboard);
 }
 
-async function readJson(filePath, fallback) {
-    try {
-        const raw = await fs.readFile(filePath, 'utf-8');
-        return JSON.parse(raw);
-    } catch {
-        await fs.writeFile(filePath, JSON.stringify(fallback, null, 2), 'utf-8');
-        return fallback;
-    }
-}
-
-async function writeJson(filePath, data) {
-    await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
-}
-
 async function sendTelegramMessage(chatId, text) {
-    if (!process.env.BOT_TOKEN || !chatId) return;
+    if (!BOT_TOKEN || !chatId) return;
     
     try {
-        const response = await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, {
+        const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ chat_id: chatId, text })
@@ -385,12 +380,9 @@ async function sendTelegramMessage(chatId, text) {
     }
 }
 
-bot.on('message', async (ctx, next) => {
-    console.log('CHAT ID:', ctx.chat.id);
-    console.log('USER ID:', ctx.from.id);
-    console.log('CHAT TYPE:', ctx.chat.type);
-    return next();
-});
+/* =========================
+BOT HANDLERS
+========================= */
 
 bot.start((ctx) => {
     clearUnavailableCartItems(ctx.session.cart);
@@ -618,6 +610,7 @@ bot.hears('🛒 Savat', (ctx) => {
     const text = getCartText(ctx.session.cart);
     
     if (total === 0) return ctx.reply(text);
+    
     return ctx.reply(`${text}\n💰 Jami: ${formatPrice(total)}`, getCartButtons(ctx.session.cart));
 });
 
@@ -629,6 +622,7 @@ bot.action('open_cart', async (ctx) => {
     const text = getCartText(ctx.session.cart);
     
     if (total === 0) return ctx.reply(text);
+    
     return ctx.reply(`${text}\n💰 Jami: ${formatPrice(total)}`, getCartButtons(ctx.session.cart));
 });
 
@@ -792,7 +786,14 @@ bot.action(/^status_(\d+)_(.+)$/, async (ctx) => {
     }
 });
 
-/* API ROUTES */
+bot.hears('☎️ Aloqa', (ctx) => {
+    return ctx.reply(`☎️ Aloqa uchun: +998 90 123 45 67\n${getWorkHoursText()}`, mainKeyboard);
+});
+
+/* =========================
+API ROUTES
+========================= */
+
 app.get('/', (req, res) => {
     res.send('Bot + API ishlayapti');
 });
@@ -834,7 +835,7 @@ app.get('/api/stream', (req, res) => {
 });
 
 app.get('/api/menu', async (req, res) => {
-    res.json(getMenu());
+    return res.json(getMenu());
 });
 
 app.post('/api/menu', async (req, res) => {
@@ -848,9 +849,9 @@ app.post('/api/menu', async (req, res) => {
         await addMenuItem(key, name, Number(price), category, image || '');
         const item = getMenuItem(normalizeKey(key));
         sendSseEvent('menu_updated');
-        res.json(item);
+        return res.json(item);
     } catch (error) {
-        res.status(400).json({ error: error.message });
+        return res.status(400).json({ error: error.message });
     }
 });
 
@@ -875,14 +876,13 @@ app.put('/api/menu/:key', async (req, res) => {
         const image = req.body.image !== undefined ? req.body.image : oldItem.image;
         
         await editMenuItem(key, name, price, category, image);
-        const updated = getMenuItem(key);
         
         if (req.body.active !== undefined) {
             await setMenuItemActive(key, Boolean(req.body.active));
         }
         
         sendSseEvent('menu_updated');
-        return res.json(getMenuItem(key) || updated);
+        return res.json(getMenuItem(key));
     } catch (error) {
         return res.status(400).json({ error: error.message });
     }
@@ -894,58 +894,51 @@ app.delete('/api/menu/:key', async (req, res) => {
     try {
         const deleted = await deleteMenuItem(key);
         sendSseEvent('menu_updated');
-        res.json(deleted);
+        return res.json(deleted);
     } catch (error) {
-        res.status(404).json({ error: error.message });
+        return res.status(404).json({ error: error.message });
     }
 });
 
 app.get('/api/orders', async (req, res) => {
-    const orders = await readJson(ORDERS_FILE, []);
-    res.json(orders);
+    return res.json(getAllOrders());
 });
 
 app.put('/api/orders/:id/status', async (req, res) => {
-    const orders = await readJson(ORDERS_FILE, []);
     const { status } = req.body;
     const id = req.params.id;
     
-    const order = orders.find((item) => String(item.id) === String(id));
-    
-    if (!order) {
-        return res.status(404).json({ error: 'Buyurtma topilmadi' });
+    try {
+        const updated = await updateOrderStatus(id, status);
+        sendSseEvent('order_updated', updated);
+        
+        await sendTelegramMessage(
+            updated.chatId,
+            [
+                '📦 Buyurtma holati yangilandi!',
+                '',
+                `🆔 Buyurtma ID: ${updated.id}`,
+                `📌 Yangi status: ${updated.status}`
+            ].join('\n')
+        );
+        
+        return res.json(updated);
+    } catch (error) {
+        return res.status(404).json({ error: error.message });
     }
-    
-    order.status = status;
-    order.updatedAt = new Date().toISOString();
-    
-    await writeJson(ORDERS_FILE, orders);
-    sendSseEvent('order_updated', order);
-    
-    await sendTelegramMessage(
-        order.chatId,
-        [
-            '📦 Buyurtma holati yangilandi!',
-            '',
-            `🆔 Buyurtma ID: ${order.id}`,
-            `📌 Yangi status: ${order.status}`
-        ].join('\n')
-    );
-    
-    res.json(order);
 });
 
 app.get('/api/stats', async (req, res) => {
-    const orders = await readJson(ORDERS_FILE, []);
+    const orders = getAllOrders();
     
     const totalOrders = orders.length;
     const newOrders = orders.filter((o) => o.status === 'Yangi buyurtma').length;
     const acceptedOrders = orders.filter((o) => o.status === 'Qabul qilindi').length;
     const readyOrders = orders.filter((o) => o.status === 'Tayyor').length;
     const deliveredOrders = orders.filter((o) => o.status === 'Yetkazildi').length;
-    const totalRevenue = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+    const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total || 0), 0);
     
-    res.json({
+    return res.json({
         totalOrders,
         newOrders,
         acceptedOrders,
@@ -955,15 +948,12 @@ app.get('/api/stats', async (req, res) => {
     });
 });
 
-bot.hears('☎️ Aloqa', (ctx) => {
-    return ctx.reply(`☎️ Aloqa uchun: +998 90 123 45 67\n${getWorkHoursText()}`, mainKeyboard);
-});
-
 bot.catch((err) => {
     console.error('BOT ERROR:', err);
 });
 
 async function startApp() {
+    await connectDb();
     await initMenu();
     await initOrders();
     
@@ -972,7 +962,16 @@ async function startApp() {
     });
     
     try {
-        await bot.launch();
+        await bot.telegram.deleteWebhook();
+    } catch (error) {
+        console.log('Webhook o‘chirishda xato:', error.message);
+    }
+    
+    try {
+        await bot.launch({
+            dropPendingUpdates: true
+        });
+        
         console.log('✅ Bot ishga tushdi');
         console.log('ADMIN_CHAT_ID:', ADMIN_CHAT_ID || 'yo‘q');
         console.log('WORK HOURS:', `${WORK_START} - ${WORK_END}`);
@@ -985,12 +984,18 @@ async function startApp() {
 
 startApp();
 
-process.once('SIGINT', () => {
-    bot.stop('SIGINT');
-    process.exit(0);
+process.once('SIGINT', async () => {
+    try {
+        await bot.stop('SIGINT');
+    } finally {
+        process.exit(0);
+    }
 });
 
-process.once('SIGTERM', () => {
-    bot.stop('SIGTERM');
-    process.exit(0);
+process.once('SIGTERM', async () => {
+    try {
+        await bot.stop('SIGTERM');
+    } finally {
+        process.exit(0);
+    }
 });
