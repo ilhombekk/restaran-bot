@@ -20,6 +20,8 @@ import {
   UtensilsCrossed,
   ChevronLeft,
   ChevronRight,
+  Clock3,
+  AtSign,
 } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -34,6 +36,43 @@ const statusMap = {
 
 function formatPrice(value) {
   return new Intl.NumberFormat('uz-UZ').format(Number(value || 0)) + " so'm";
+}
+
+function formatDateTime(value) {
+  if (!value) return "Vaqt yo‘q";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Vaqt yo‘q";
+  
+  return new Intl.DateTimeFormat('uz-UZ', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function formatDateOnly(value) {
+  if (!value) return "Sana yo‘q";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Sana yo‘q";
+  
+  return new Intl.DateTimeFormat('uz-UZ', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+function getDateKey(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'unknown';
+  
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  
+  return `${year}-${month}-${day}`;
 }
 
 function Card({ children, style = {} }) {
@@ -203,6 +242,10 @@ function OrderCard({ order, onStatusChange }) {
   : [];
   
   const location = getLocationData(order);
+  const username =
+  order?.username
+  ? String(order.username).replace(/^@/, '')
+  : '';
   
   return (
     <motion.div layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
@@ -216,11 +259,21 @@ function OrderCard({ order, onStatusChange }) {
     
     <div style={{ marginTop: 16, display: 'grid', gap: 10, color: '#475569', fontSize: 14 }}>
     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-    <Eye size={16} /> {order.name}
+    <Eye size={16} /> {order.name || "Noma’lum"}
     </div>
     
     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-    <Phone size={16} /> {order.phone}
+    <Phone size={16} /> {order.phone || "Telefon yo‘q"}
+    </div>
+    
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+    <AtSign size={16} />
+    {username ? `@${username}` : 'Username yo‘q'}
+    </div>
+    
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+    <Clock3 size={16} />
+    {formatDateTime(order.createdAt)}
     </div>
     
     <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
@@ -334,6 +387,43 @@ function buildStatsFromOrders(orders) {
     deliveredOrders,
     totalRevenue,
   };
+}
+
+function buildDailyStats(orders) {
+  const map = new Map();
+  
+  for (const order of orders) {
+    const key = getDateKey(order.createdAt);
+    if (key === 'unknown') continue;
+    
+    if (!map.has(key)) {
+      map.set(key, {
+        dateKey: key,
+        dateLabel: formatDateOnly(order.createdAt),
+        totalOrders: 0,
+        revenue: 0,
+        deliveredRevenue: 0,
+        newOrders: 0,
+        acceptedOrders: 0,
+        readyOrders: 0,
+        deliveredOrders: 0,
+      });
+    }
+    
+    const item = map.get(key);
+    item.totalOrders += 1;
+    item.revenue += Number(order.total || 0);
+    
+    if (order.status === 'Yangi buyurtma') item.newOrders += 1;
+    if (order.status === 'Qabul qilindi') item.acceptedOrders += 1;
+    if (order.status === 'Tayyor') item.readyOrders += 1;
+    if (order.status === 'Yetkazildi') {
+      item.deliveredOrders += 1;
+      item.deliveredRevenue += Number(order.total || 0);
+    }
+  }
+  
+  return Array.from(map.values()).sort((a, b) => b.dateKey.localeCompare(a.dateKey));
 }
 
 function Pagination({ currentPage, totalPages, onPageChange }) {
@@ -483,7 +573,8 @@ export default function App() {
     return orders.filter((order) =>
       String(order.name || '').toLowerCase().includes(search.toLowerCase()) ||
     String(order.id).includes(search) ||
-    String(order.phone || '').includes(search)
+    String(order.phone || '').includes(search) ||
+    String(order.username || '').toLowerCase().includes(search.toLowerCase())
   );
 }, [orders, search]);
 
@@ -506,6 +597,7 @@ const paginatedOrders = useMemo(() => {
 }, [filteredOrders, orderPage]);
 
 const categories = [...new Set(products.map((p) => p.category).filter(Boolean))];
+const dailyStats = useMemo(() => buildDailyStats(orders), [orders]);
 
 async function handleStatusChange(id, status) {
   try {
@@ -658,7 +750,7 @@ return (
   <div>
   <div style={{ fontSize: 34, fontWeight: 800, color: '#0f172a' }}>Admin Panel</div>
   <div style={{ color: '#64748b', marginTop: 6 }}>
-  Buyurtmalar va mahsulotlar real fayllar bilan ishlayapti.
+  Buyurtmalar va mahsulotlar real ma’lumotlar bilan ishlayapti.
   </div>
   <div style={{ color: '#16a34a', marginTop: 6, fontSize: 13 }}>
   {streamStatus}
@@ -823,8 +915,9 @@ return (
   )}
   
   {page === 'stats' && (
+    <div style={{ display: 'grid', gap: 24 }}>
     <Card>
-    <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 20 }}>Statistika</div>
+    <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 20 }}>Umumiy statistika</div>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
     <div style={{ padding: 18, borderRadius: 20, background: '#f8fafc' }}>
     <div style={{ fontSize: 14, color: '#64748b' }}>Qabul qilingan</div>
@@ -852,6 +945,92 @@ return (
     </div>
     </div>
     </Card>
+    
+    <Card>
+    <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 20 }}>Har kunlik statistika</div>
+    
+    {dailyStats.length === 0 ? (
+      <div style={{ color: '#64748b' }}>Hozircha kunlik statistika yo‘q</div>
+    ) : (
+      <div style={{ display: 'grid', gap: 16 }}>
+      {dailyStats.map((day) => (
+        <div
+        key={day.dateKey}
+        style={{
+          border: '1px solid #e2e8f0',
+          borderRadius: 20,
+          padding: 18,
+          background: '#fff',
+        }}
+        >
+        <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: 16,
+          alignItems: 'center',
+          marginBottom: 16,
+          flexWrap: 'wrap',
+        }}
+        >
+        <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>
+        {day.dateLabel}
+        </div>
+        <div
+        style={{
+          padding: '8px 12px',
+          borderRadius: 999,
+          background: '#eff6ff',
+          color: '#1d4ed8',
+          fontWeight: 700,
+          fontSize: 13,
+        }}
+        >
+        {day.totalOrders} ta zakaz
+        </div>
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+        <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
+        <div style={{ fontSize: 13, color: '#64748b' }}>Kunlik jami zakaz</div>
+        <div style={{ marginTop: 8, fontSize: 24, fontWeight: 800 }}>{day.totalOrders}</div>
+        </div>
+        
+        <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
+        <div style={{ fontSize: 13, color: '#64748b' }}>Kunlik daromad</div>
+        <div style={{ marginTop: 8, fontSize: 24, fontWeight: 800 }}>
+        {formatPrice(day.revenue)}
+        </div>
+        </div>
+        
+        <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
+        <div style={{ fontSize: 13, color: '#64748b' }}>Yetkazilgan daromad</div>
+        <div style={{ marginTop: 8, fontSize: 24, fontWeight: 800 }}>
+        {formatPrice(day.deliveredRevenue)}
+        </div>
+        </div>
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginTop: 14 }}>
+        <div style={{ padding: 14, borderRadius: 16, background: '#eff6ff', color: '#1d4ed8', fontWeight: 700 }}>
+        Yangi: {day.newOrders}
+        </div>
+        <div style={{ padding: 14, borderRadius: 16, background: '#fef3c7', color: '#b45309', fontWeight: 700 }}>
+        Qabul qilindi: {day.acceptedOrders}
+        </div>
+        <div style={{ padding: 14, borderRadius: 16, background: '#ede9fe', color: '#6d28d9', fontWeight: 700 }}>
+        Tayyor: {day.readyOrders}
+        </div>
+        <div style={{ padding: 14, borderRadius: 16, background: '#d1fae5', color: '#047857', fontWeight: 700 }}>
+        Yetkazildi: {day.deliveredOrders}
+        </div>
+        </div>
+        </div>
+      ))}
+      </div>
+    )}
+    </Card>
+    </div>
   )}
   </div>
   </div>
