@@ -21,6 +21,8 @@ export async function initOrders() {
         status: item.status || 'Yangi buyurtma',
         createdAt: item.createdAt,
         updatedAt: item.updatedAt || item.createdAt,
+        adminMessageId: item.adminMessageId || null,
+        adminLocationMessageId: item.adminLocationMessageId || null,
     }));
     
     return ordersCache;
@@ -40,6 +42,8 @@ export async function addOrder(order) {
         total: Number(order.total || 0),
         createdAt: order.createdAt || new Date().toISOString(),
         updatedAt: order.updatedAt || new Date().toISOString(),
+        adminMessageId: order.adminMessageId || null,
+        adminLocationMessageId: order.adminLocationMessageId || null,
     };
     
     const collection = await getOrdersCollection();
@@ -65,6 +69,38 @@ export async function updateOrderStatus(id, status) {
         {
             $set: {
                 status: order.status,
+                updatedAt: order.updatedAt,
+            }
+        }
+    );
+    
+    return order;
+}
+
+export async function updateOrderAdminMessages(id, data = {}) {
+    const order = getOrderById(id);
+    
+    if (!order) {
+        throw new Error('Buyurtma topilmadi');
+    }
+    
+    if (data.adminMessageId !== undefined) {
+        order.adminMessageId = data.adminMessageId;
+    }
+    
+    if (data.adminLocationMessageId !== undefined) {
+        order.adminLocationMessageId = data.adminLocationMessageId;
+    }
+    
+    order.updatedAt = new Date().toISOString();
+    
+    const collection = await getOrdersCollection();
+    await collection.updateOne(
+        { id: String(id) },
+        {
+            $set: {
+                adminMessageId: order.adminMessageId ?? null,
+                adminLocationMessageId: order.adminLocationMessageId ?? null,
                 updatedAt: order.updatedAt,
             }
         }

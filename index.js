@@ -22,6 +22,7 @@ import {
     addOrder,
     getOrderById,
     updateOrderStatus,
+    updateOrderAdminMessages,
     getTodayStats,
     getAllOrders
 } from './orders.js';
@@ -252,6 +253,35 @@ function buildAdminText(order) {
         ].join('\n');
     }
     
+    async function syncAdminOrderMessage(order) {
+        if (!ADMIN_CHAT_ID || !order?.adminMessageId) return;
+        
+        try {
+            const nextButtons = getButtonsByStatus(order);
+            
+            if (nextButtons) {
+                await bot.telegram.editMessageText(
+                    ADMIN_CHAT_ID,
+                    order.adminMessageId,
+                    undefined,
+                    buildAdminText(order),
+                    {
+                        reply_markup: nextButtons.reply_markup
+                    }
+                );
+            } else {
+                await bot.telegram.editMessageText(
+                    ADMIN_CHAT_ID,
+                    order.adminMessageId,
+                    undefined,
+                    buildAdminText(order)
+                );
+            }
+        } catch (error) {
+            console.log('Admin kanal xabarini yangilashda xato:', error.message);
+        }
+    }
+    
     function clearUnavailableCartItems(cart) {
         const menu = getMenu();
         for (const key of Object.keys(cart)) {
@@ -391,7 +421,9 @@ function buildAdminText(order) {
             total,
             status: 'Yangi buyurtma',
             createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
+            adminMessageId: null,
+            adminLocationMessageId: null
         };
         
         await addOrder(order);
@@ -413,14 +445,31 @@ function buildAdminText(order) {
         
         if (ADMIN_CHAT_ID) {
             try {
-                await bot.telegram.sendMessage(
+                const adminMessage = await bot.telegram.sendMessage(
                     ADMIN_CHAT_ID,
                     buildAdminText(order),
                     getButtonsByStatus(order)
                 );
                 
+                let adminLocationMessageId = null;
+                
                 if (locationData?.lat && locationData?.lon) {
-                    await bot.telegram.sendLocation(ADMIN_CHAT_ID, locationData.lat, locationData.lon);
+                    const locationMessage = await bot.telegram.sendLocation(
+                        ADMIN_CHAT_ID,
+                        locationData.lat,
+                        locationData.lon
+                    );
+                    adminLocationMessageId = locationMessage?.message_id ?? null;
+                }
+                
+                await updateOrderAdminMessages(order.id, {
+                    adminMessageId: adminMessage?.message_id ?? null,
+                    adminLocationMessageId
+                });
+                
+                const freshOrder = getOrderById(order.id);
+                if (freshOrder) {
+                    sendSseEvent('order_updated', freshOrder);
                 }
             } catch (error) {
                 console.log('Admin ga yuborishda xato:', error.message);
@@ -817,6 +866,8 @@ function buildAdminText(order) {
             console.log('Admin xabarini yangilashda xato:', error.message);
         }
         
+        await syncAdminOrderMessage(updatedOrder);
+        
         try {
             await bot.telegram.sendMessage(
                 updatedOrder.chatId,
@@ -956,6 +1007,8 @@ function buildAdminText(order) {
         try {
             const updated = await updateOrderStatus(id, status);
             sendSseEvent('order_updated', updated);
+            
+            await syncAdminOrderMessage(updated);
             
             await sendTelegramMessage(
                 updated.chatId,
