@@ -120,9 +120,7 @@ function isRestaurantOpen() {
     const startMinutes = timeToMinutes(WORK_START);
     const endMinutes = timeToMinutes(WORK_END);
     
-    if (startMinutes === endMinutes) {
-        return true;
-    }
+    if (startMinutes === endMinutes) return true;
     
     if (endMinutes > startMinutes) {
         return nowMinutes >= startMinutes && nowMinutes < endMinutes;
@@ -363,6 +361,78 @@ function buildAdminText(order) {
         
         if (edit) return ctx.editMessageText(text, keyboard);
         return ctx.reply(text, keyboard);
+    }
+    
+    async function finalizeOrder(ctx, locationData, locationNoticeText) {
+        clearUnavailableCartItems(ctx.session.cart);
+        
+        const total = getCartTotal(ctx.session.cart);
+        if (total === 0) {
+            ctx.session.step = null;
+            ctx.session.orderData = {};
+            ctx.session.currentCategory = null;
+            return ctx.reply('🛒 Savat bo‘sh bo‘lib qoldi.', mainKeyboard);
+        }
+        
+        const cartText = getCartText(ctx.session.cart);
+        const orderId = generateOrderId();
+        
+        const order = {
+            id: orderId,
+            name: ctx.session.orderData.name,
+            phone: ctx.session.orderData.phone,
+            username: ctx.session.orderData.username,
+            telegramName: [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || 'Noma’lum',
+            userId: ctx.from.id,
+            chatId: ctx.chat.id,
+            location: locationData,
+            cart: { ...ctx.session.cart },
+            cartText,
+            total,
+            status: 'Yangi buyurtma',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        
+        await addOrder(order);
+        sendSseEvent('order_created', order);
+        
+        const userText = [
+            '✅ Buyurtma qabul qilindi!',
+            '',
+            `🆔 Buyurtma ID: ${order.id}`,
+            `👤 Ism: ${order.name}`,
+            `📞 Telefon: ${order.phone}`,
+            locationNoticeText,
+            '',
+            order.cartText,
+            `💰 Jami: ${formatPrice(order.total)}`,
+            '',
+            `📌 Holat: ${order.status}`
+        ].join('\n');
+        
+        if (ADMIN_CHAT_ID) {
+            try {
+                await bot.telegram.sendMessage(
+                    ADMIN_CHAT_ID,
+                    buildAdminText(order),
+                    getButtonsByStatus(order)
+                );
+                
+                if (locationData?.lat && locationData?.lon) {
+                    await bot.telegram.sendLocation(ADMIN_CHAT_ID, locationData.lat, locationData.lon);
+                }
+            } catch (error) {
+                console.log('Admin ga yuborishda xato:', error.message);
+            }
+        }
+        
+        ctx.session.cart = {};
+        ctx.session.step = null;
+        ctx.session.orderData = {};
+        ctx.session.currentCategory = null;
+        
+        return ctx.reply(userText, mainKeyboard);
     }
     
     async function sendTelegramMessage(chatId, text) {
@@ -674,7 +744,7 @@ function buildAdminText(order) {
         ctx.session.step = 'address';
         
         return ctx.reply(
-            '📍 Manzilni qo‘lda yozib yuboring.\n\nMasalan:\nShovot tumani, Bozor ko‘chasi 12-uy\n\nYoki xohlasangiz lokatsiya yuborishingiz ham mumkin.',
+            '📍 Manzilni yuboring.\n\n1) Qo‘lda yozsangiz bo‘ladi\n2) Yoki lokatsiya yuborsangiz bo‘ladi',
             Markup.keyboard([
                 [Markup.button.locationRequest('📍 Lokatsiya yuborish')],
                 ['✍️ Manzilni yozaman']
@@ -684,146 +754,38 @@ function buildAdminText(order) {
     
     bot.hears('✍️ Manzilni yozaman', (ctx) => {
         if (ctx.session.step !== 'address') return;
-        return ctx.reply('Manzilni yozib yuboring:');
+        return ctx.reply('Manzilni yozib yuboring:\n\nMasalan: Shovot tumani, Bozor ko‘chasi 12-uy');
     });
     
     bot.on('location', async (ctx) => {
         if (ctx.session.step !== 'address') return;
         
-        clearUnavailableCartItems(ctx.session.cart);
-        
         const { latitude, longitude } = ctx.message.location;
-        const total = getCartTotal(ctx.session.cart);
-        const cartText = getCartText(ctx.session.cart);
-        const orderId = generateOrderId();
         
-        const order = {
-            id: orderId,
-            name: ctx.session.orderData.name,
-            phone: ctx.session.orderData.phone,
-            username: ctx.session.orderData.username,
-            telegramName: [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || 'Noma’lum',
-            userId: ctx.from.id,
-            chatId: ctx.chat.id,
-            location: {
+        return finalizeOrder(
+            ctx,
+            {
                 lat: latitude,
                 lon: longitude,
                 text: `${latitude}, ${longitude}`
             },
-            cart: { ...ctx.session.cart },
-            cartText,
-            total,
-            status: 'Yangi buyurtma',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        };
-        
-        await addOrder(order);
-        sendSseEvent('order_created', order);
-        
-        const userText = [
-            '✅ Buyurtma qabul qilindi!',
-            '',
-            `🆔 Buyurtma ID: ${order.id}`,
-            `👤 Ism: ${order.name}`,
-            `📞 Telefon: ${order.phone}`,
-            '📍 Lokatsiya yuborildi',
-            '',
-            order.cartText,
-            `💰 Jami: ${formatPrice(order.total)}`,
-            '',
-            `📌 Holat: ${order.status}`
-        ].join('\n');
-        
-        if (ADMIN_CHAT_ID) {
-            try {
-                await bot.telegram.sendMessage(
-                    ADMIN_CHAT_ID,
-                    buildAdminText(order),
-                    getButtonsByStatus(order)
-                );
-                await bot.telegram.sendLocation(ADMIN_CHAT_ID, latitude, longitude);
-            } catch (error) {
-                console.log('Admin ga yuborishda xato:', error.message);
-            }
-        }
-        
-        ctx.session.cart = {};
-        ctx.session.step = null;
-        ctx.session.orderData = {};
-        ctx.session.currentCategory = null;
-        
-        return ctx.reply(userText, mainKeyboard);
+            '📍 Lokatsiya yuborildi'
+        );
     });
     
     bot.on('text', async (ctx, next) => {
+        const text = (ctx.message.text || '').trim();
+        
         if (ctx.session.step === 'address') {
-            const text = (ctx.message.text || '').trim();
-            
-            if (!text || text.length < 5) {
+            if (!text || text.length < 5 || text === '✍️ Manzilni yozaman') {
                 return ctx.reply('Iltimos, manzilni to‘liqroq yozing.');
             }
             
-            clearUnavailableCartItems(ctx.session.cart);
-            
-            const total = getCartTotal(ctx.session.cart);
-            const cartText = getCartText(ctx.session.cart);
-            const orderId = generateOrderId();
-            
-            const order = {
-                id: orderId,
-                name: ctx.session.orderData.name,
-                phone: ctx.session.orderData.phone,
-                username: ctx.session.orderData.username,
-                telegramName: [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || 'Noma’lum',
-                userId: ctx.from.id,
-                chatId: ctx.chat.id,
-                location: {
-                    text
-                },
-                cart: { ...ctx.session.cart },
-                cartText,
-                total,
-                status: 'Yangi buyurtma',
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            };
-            
-            await addOrder(order);
-            sendSseEvent('order_created', order);
-            
-            const userText = [
-                '✅ Buyurtma qabul qilindi!',
-                '',
-                `🆔 Buyurtma ID: ${order.id}`,
-                `👤 Ism: ${order.name}`,
-                `📞 Telefon: ${order.phone}`,
-                `📍 Manzil: ${text}`,
-                '',
-                order.cartText,
-                `💰 Jami: ${formatPrice(order.total)}`,
-                '',
-                `📌 Holat: ${order.status}`
-            ].join('\n');
-            
-            if (ADMIN_CHAT_ID) {
-                try {
-                    await bot.telegram.sendMessage(
-                        ADMIN_CHAT_ID,
-                        buildAdminText(order),
-                        getButtonsByStatus(order)
-                    );
-                } catch (error) {
-                    console.log('Admin ga yuborishda xato:', error.message);
-                }
-            }
-            
-            ctx.session.cart = {};
-            ctx.session.step = null;
-            ctx.session.orderData = {};
-            ctx.session.currentCategory = null;
-            
-            return ctx.reply(userText, mainKeyboard);
+            return finalizeOrder(
+                ctx,
+                { text },
+                `📍 Manzil: ${text}`
+            );
         }
         
         return next();
