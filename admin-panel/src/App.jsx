@@ -22,6 +22,8 @@ import {
   ChevronRight,
   Clock3,
   AtSign,
+  Upload,
+  Link as LinkIcon
 } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -52,29 +54,6 @@ function formatDateTime(value) {
   }).format(date);
 }
 
-function formatDateOnly(value) {
-  if (!value) return "Sana yo‘q";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Sana yo‘q";
-  
-  return new Intl.DateTimeFormat('uz-UZ', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date);
-}
-
-function getDateKey(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'unknown';
-  
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  
-  return `${year}-${month}-${day}`;
-}
-
 function Card({ children, style = {} }) {
   return (
     <div
@@ -91,9 +70,10 @@ function Card({ children, style = {} }) {
   );
 }
 
-function Button({ children, onClick, style = {}, disabled = false }) {
+function Button({ children, onClick, style = {}, disabled = false, type = 'button' }) {
   return (
     <button
+    type={type}
     onClick={onClick}
     disabled={disabled}
     style={{
@@ -218,6 +198,8 @@ function getLocationData(order) {
   order?.longitude ??
   null;
   
+  const text = order?.location?.text || '';
+  
   const hasCoords =
   lat !== null &&
   lat !== undefined &&
@@ -229,6 +211,7 @@ function getLocationData(order) {
   return {
     lat: hasCoords ? Number(lat) : null,
     lon: hasCoords ? Number(lon) : null,
+    text,
     hasCoords,
     link: hasCoords ? `https://maps.google.com/?q=${Number(lat)},${Number(lon)}` : '',
   };
@@ -242,10 +225,7 @@ function OrderCard({ order, onStatusChange }) {
   : [];
   
   const location = getLocationData(order);
-  const username =
-  order?.username
-  ? String(order.username).replace(/^@/, '')
-  : '';
+  const username = order?.username ? `@${String(order.username).replace(/^@/, '')}` : 'Username yo‘q';
   
   return (
     <motion.div layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
@@ -267,21 +247,19 @@ function OrderCard({ order, onStatusChange }) {
     </div>
     
     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-    <AtSign size={16} />
-    {username ? `@${username}` : 'Username yo‘q'}
+    <AtSign size={16} /> {username}
     </div>
     
     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-    <Clock3 size={16} />
-    {formatDateTime(order.createdAt)}
+    <Clock3 size={16} /> {formatDateTime(order.createdAt)}
     </div>
     
     <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
     <MapPin size={16} style={{ marginTop: 2, flexShrink: 0 }} />
     <div style={{ display: 'grid', gap: 6 }}>
+    {location.text ? <span>{location.text}</span> : null}
+    
     {location.hasCoords ? (
-      <>
-      <span>{location.lat}, {location.lon}</span>
       <a
       href={location.link}
       target="_blank"
@@ -290,10 +268,9 @@ function OrderCard({ order, onStatusChange }) {
       >
       Xaritada ochish
       </a>
-      </>
-    ) : (
-      <span>Lokatsiya yo‘q</span>
-    )}
+    ) : !location.text ? (
+      <span>Manzil yo‘q</span>
+    ) : null}
     </div>
     </div>
     </div>
@@ -389,43 +366,6 @@ function buildStatsFromOrders(orders) {
   };
 }
 
-function buildDailyStats(orders) {
-  const map = new Map();
-  
-  for (const order of orders) {
-    const key = getDateKey(order.createdAt);
-    if (key === 'unknown') continue;
-    
-    if (!map.has(key)) {
-      map.set(key, {
-        dateKey: key,
-        dateLabel: formatDateOnly(order.createdAt),
-        totalOrders: 0,
-        revenue: 0,
-        deliveredRevenue: 0,
-        newOrders: 0,
-        acceptedOrders: 0,
-        readyOrders: 0,
-        deliveredOrders: 0,
-      });
-    }
-    
-    const item = map.get(key);
-    item.totalOrders += 1;
-    item.revenue += Number(order.total || 0);
-    
-    if (order.status === 'Yangi buyurtma') item.newOrders += 1;
-    if (order.status === 'Qabul qilindi') item.acceptedOrders += 1;
-    if (order.status === 'Tayyor') item.readyOrders += 1;
-    if (order.status === 'Yetkazildi') {
-      item.deliveredOrders += 1;
-      item.deliveredRevenue += Number(order.total || 0);
-    }
-  }
-  
-  return Array.from(map.values()).sort((a, b) => b.dateKey.localeCompare(a.dateKey));
-}
-
 function Pagination({ currentPage, totalPages, onPageChange }) {
   if (totalPages <= 1) return null;
   
@@ -451,11 +391,7 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
     <Button
     onClick={() => onPageChange(currentPage - 1)}
     disabled={currentPage === 1}
-    style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 6,
-    }}
+    style={{ display: 'flex', alignItems: 'center', gap: 6 }}
     >
     <ChevronLeft size={16} />
     Oldingi
@@ -483,11 +419,7 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
     <Button
     onClick={() => onPageChange(currentPage + 1)}
     disabled={currentPage === totalPages}
-    style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 6,
-    }}
+    style={{ display: 'flex', alignItems: 'center', gap: 6 }}
     >
     Keyingi
     <ChevronRight size={16} />
@@ -513,6 +445,7 @@ export default function App() {
   const [editingId, setEditingId] = useState(null);
   const [streamStatus, setStreamStatus] = useState('Ulanmoqda...');
   const [orderPage, setOrderPage] = useState(1);
+  const [imageMode, setImageMode] = useState('url');
   const [form, setForm] = useState({
     id: '',
     name: '',
@@ -574,7 +507,8 @@ export default function App() {
       String(order.name || '').toLowerCase().includes(search.toLowerCase()) ||
     String(order.id).includes(search) ||
     String(order.phone || '').includes(search) ||
-    String(order.username || '').toLowerCase().includes(search.toLowerCase())
+    String(order.username || '').toLowerCase().includes(search.toLowerCase()) ||
+    String(order.location?.text || '').toLowerCase().includes(search.toLowerCase())
   );
 }, [orders, search]);
 
@@ -597,7 +531,6 @@ const paginatedOrders = useMemo(() => {
 }, [filteredOrders, orderPage]);
 
 const categories = [...new Set(products.map((p) => p.category).filter(Boolean))];
-const dailyStats = useMemo(() => buildDailyStats(orders), [orders]);
 
 async function handleStatusChange(id, status) {
   try {
@@ -606,6 +539,7 @@ async function handleStatusChange(id, status) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     });
+    
     await loadData();
   } catch (error) {
     console.error('Statusni yangilashda xato:', error);
@@ -614,12 +548,14 @@ async function handleStatusChange(id, status) {
 
 function openAdd() {
   setEditingId(null);
+  setImageMode('url');
   setForm({ id: '', name: '', price: '', category: 'Fast Food', image: '' });
   setShowForm(true);
 }
 
 function openEdit(product) {
   setEditingId(product.key);
+  setImageMode(product.image?.startsWith('data:image') ? 'upload' : 'url');
   setForm({
     id: product.key,
     name: product.name,
@@ -686,6 +622,19 @@ async function deleteProduct(product) {
   } catch (error) {
     console.error('Mahsulotni o‘chirishda xato:', error);
   }
+}
+
+function handleImageFileChange(file) {
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = () => {
+    setForm((prev) => ({
+      ...prev,
+      image: String(reader.result || '')
+    }));
+  };
+  reader.readAsDataURL(file);
 }
 
 return (
@@ -915,9 +864,8 @@ return (
   )}
   
   {page === 'stats' && (
-    <div style={{ display: 'grid', gap: 24 }}>
     <Card>
-    <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 20 }}>Umumiy statistika</div>
+    <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 20 }}>Statistika</div>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
     <div style={{ padding: 18, borderRadius: 20, background: '#f8fafc' }}>
     <div style={{ fontSize: 14, color: '#64748b' }}>Qabul qilingan</div>
@@ -945,92 +893,6 @@ return (
     </div>
     </div>
     </Card>
-    
-    <Card>
-    <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 20 }}>Har kunlik statistika</div>
-    
-    {dailyStats.length === 0 ? (
-      <div style={{ color: '#64748b' }}>Hozircha kunlik statistika yo‘q</div>
-    ) : (
-      <div style={{ display: 'grid', gap: 16 }}>
-      {dailyStats.map((day) => (
-        <div
-        key={day.dateKey}
-        style={{
-          border: '1px solid #e2e8f0',
-          borderRadius: 20,
-          padding: 18,
-          background: '#fff',
-        }}
-        >
-        <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          gap: 16,
-          alignItems: 'center',
-          marginBottom: 16,
-          flexWrap: 'wrap',
-        }}
-        >
-        <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>
-        {day.dateLabel}
-        </div>
-        <div
-        style={{
-          padding: '8px 12px',
-          borderRadius: 999,
-          background: '#eff6ff',
-          color: '#1d4ed8',
-          fontWeight: 700,
-          fontSize: 13,
-        }}
-        >
-        {day.totalOrders} ta zakaz
-        </div>
-        </div>
-        
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-        <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
-        <div style={{ fontSize: 13, color: '#64748b' }}>Kunlik jami zakaz</div>
-        <div style={{ marginTop: 8, fontSize: 24, fontWeight: 800 }}>{day.totalOrders}</div>
-        </div>
-        
-        <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
-        <div style={{ fontSize: 13, color: '#64748b' }}>Kunlik daromad</div>
-        <div style={{ marginTop: 8, fontSize: 24, fontWeight: 800 }}>
-        {formatPrice(day.revenue)}
-        </div>
-        </div>
-        
-        <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
-        <div style={{ fontSize: 13, color: '#64748b' }}>Yetkazilgan daromad</div>
-        <div style={{ marginTop: 8, fontSize: 24, fontWeight: 800 }}>
-        {formatPrice(day.deliveredRevenue)}
-        </div>
-        </div>
-        </div>
-        
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginTop: 14 }}>
-        <div style={{ padding: 14, borderRadius: 16, background: '#eff6ff', color: '#1d4ed8', fontWeight: 700 }}>
-        Yangi: {day.newOrders}
-        </div>
-        <div style={{ padding: 14, borderRadius: 16, background: '#fef3c7', color: '#b45309', fontWeight: 700 }}>
-        Qabul qilindi: {day.acceptedOrders}
-        </div>
-        <div style={{ padding: 14, borderRadius: 16, background: '#ede9fe', color: '#6d28d9', fontWeight: 700 }}>
-        Tayyor: {day.readyOrders}
-        </div>
-        <div style={{ padding: 14, borderRadius: 16, background: '#d1fae5', color: '#047857', fontWeight: 700 }}>
-        Yetkazildi: {day.deliveredOrders}
-        </div>
-        </div>
-        </div>
-      ))}
-      </div>
-    )}
-    </Card>
-    </div>
   )}
   </div>
   </div>
@@ -1051,7 +913,7 @@ return (
     onClick={(e) => e.stopPropagation()}
     style={{
       width: '100%',
-      maxWidth: 520,
+      maxWidth: 560,
       background: '#fff',
       borderRadius: 28,
       padding: 24,
@@ -1068,27 +930,106 @@ return (
     value={form.id}
     onChange={(e) => setForm((prev) => ({ ...prev, id: e.target.value }))}
     />
+    
     <Input
     placeholder="Mahsulot nomi"
     value={form.name}
     onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
     />
+    
     <Input
     placeholder="Narxi"
     type="number"
     value={form.price}
     onChange={(e) => setForm((prev) => ({ ...prev, price: e.target.value }))}
     />
+    
     <Input
     placeholder="Kategoriya"
     value={form.category}
     onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
     />
-    <Input
-    placeholder="Rasm URL"
-    value={form.image}
-    onChange={(e) => setForm((prev) => ({ ...prev, image: e.target.value }))}
-    />
+    
+    <div style={{ display: 'flex', gap: 10 }}>
+    <Button
+    onClick={() => setImageMode('url')}
+    style={{
+      flex: 1,
+      background: imageMode === 'url' ? '#0f172a' : '#e2e8f0',
+      color: imageMode === 'url' ? '#fff' : '#0f172a',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    }}
+    >
+    <LinkIcon size={16} />
+    URL bilan
+    </Button>
+    
+    <Button
+    onClick={() => setImageMode('upload')}
+    style={{
+      flex: 1,
+      background: imageMode === 'upload' ? '#0f172a' : '#e2e8f0',
+      color: imageMode === 'upload' ? '#fff' : '#0f172a',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    }}
+    >
+    <Upload size={16} />
+    Upload
+    </Button>
+    </div>
+    
+    {imageMode === 'url' ? (
+      <Input
+      placeholder="Rasm URL"
+      value={form.image}
+      onChange={(e) => setForm((prev) => ({ ...prev, image: e.target.value }))}
+      />
+    ) : (
+      <input
+      type="file"
+      accept="image/*"
+      onChange={(e) => handleImageFileChange(e.target.files?.[0])}
+      style={{
+        width: '100%',
+        padding: '12px 14px',
+        borderRadius: 16,
+        border: '1px solid #e2e8f0',
+        outline: 'none',
+        fontSize: 14,
+        background: '#fff',
+      }}
+      />
+    )}
+    
+    {form.image ? (
+      <div
+      style={{
+        border: '1px solid #e2e8f0',
+        borderRadius: 18,
+        padding: 12,
+        background: '#f8fafc',
+      }}
+      >
+      <div style={{ fontSize: 13, color: '#64748b', marginBottom: 10 }}>Rasm preview</div>
+      <img
+      src={form.image}
+      alt="preview"
+      style={{
+        width: '100%',
+        maxHeight: 220,
+        objectFit: 'contain',
+        borderRadius: 14,
+        background: '#fff',
+      }}
+      />
+      </div>
+    ) : null}
     </div>
     
     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
