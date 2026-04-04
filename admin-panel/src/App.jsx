@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
+import Login from './Login';
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -23,7 +24,10 @@ import {
   Clock3,
   AtSign,
   Upload,
-  Link as LinkIcon
+  Link as LinkIcon,
+  LogOut,
+  History,
+  ClipboardList,
 } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -75,6 +79,13 @@ function getDateKey(value) {
   const day = String(date.getDate()).padStart(2, '0');
   
   return `${year}-${month}-${day}`;
+}
+
+function playNotificationSound() {
+  try {
+    const audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+    audio.play().catch(() => {});
+  } catch {}
 }
 
 function Card({ children, style = {} }) {
@@ -240,7 +251,7 @@ function getLocationData(order) {
   };
 }
 
-function OrderCard({ order, onStatusChange }) {
+function OrderCard({ order, onStatusChange, hideActions = false }) {
   const items = typeof order.cartText === 'string'
   ? order.cartText
   .split('\n')
@@ -341,29 +352,33 @@ function OrderCard({ order, onStatusChange }) {
     </div>
     </div>
     
-    <Button
-    onClick={() => onStatusChange(order.id, 'Qabul qilindi')}
-    disabled={order.status !== 'Yangi buyurtma'}
-    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-    >
-    <CheckCircle2 size={16} /> Qabul qilindi
-    </Button>
-    
-    <Button
-    onClick={() => onStatusChange(order.id, 'Tayyor')}
-    disabled={order.status !== 'Qabul qilindi'}
-    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-    >
-    <ChefHat size={16} /> Tayyor
-    </Button>
-    
-    <Button
-    onClick={() => onStatusChange(order.id, 'Yetkazildi')}
-    disabled={order.status !== 'Tayyor'}
-    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-    >
-    <Truck size={16} /> Yetkazildi
-    </Button>
+    {!hideActions && (
+      <>
+      <Button
+      onClick={() => onStatusChange(order.id, 'Qabul qilindi')}
+      disabled={order.status !== 'Yangi buyurtma'}
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+      >
+      <CheckCircle2 size={16} /> Qabul qilindi
+      </Button>
+      
+      <Button
+      onClick={() => onStatusChange(order.id, 'Tayyor')}
+      disabled={order.status !== 'Qabul qilindi'}
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+      >
+      <ChefHat size={16} /> Tayyor
+      </Button>
+      
+      <Button
+      onClick={() => onStatusChange(order.id, 'Yetkazildi')}
+      disabled={order.status !== 'Tayyor'}
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+      >
+      <Truck size={16} /> Yetkazildi
+      </Button>
+      </>
+    )}
     </div>
     </div>
     </Card>
@@ -506,6 +521,12 @@ export default function App() {
   const [streamStatus, setStreamStatus] = useState('Ulanmoqda...');
   const [orderPage, setOrderPage] = useState(1);
   const [imageMode, setImageMode] = useState('url');
+  const [orderTab, setOrderTab] = useState('active');
+  const [isAuth, setIsAuth] = useState(
+    localStorage.getItem('admin_auth') === 'true'
+  );
+  const notifiedOrderIdsRef = useRef(new Set());
+  
   const [form, setForm] = useState({
     id: '',
     name: '',
@@ -514,7 +535,7 @@ export default function App() {
     image: '',
   });
   
-  async function loadData() {
+  async function loadData({ playSoundForNew = false } = {}) {
     try {
       const [menuRes, ordersRes, statsRes] = await Promise.all([
         fetch(`${API}/menu`),
@@ -525,14 +546,30 @@ export default function App() {
       const menuData = await menuRes.json();
       const ordersData = await ordersRes.json();
       
+      const safeOrders = Array.isArray(ordersData) ? ordersData : [];
+      
+      if (playSoundForNew) {
+        const incomingIds = safeOrders.map((order) => String(order.id));
+        const knownIds = notifiedOrderIdsRef.current;
+        const hasNewOrder = incomingIds.some((id) => !knownIds.has(id));
+        
+        if (hasNewOrder && knownIds.size > 0) {
+          playNotificationSound();
+        }
+        
+        notifiedOrderIdsRef.current = new Set(incomingIds);
+      } else if (notifiedOrderIdsRef.current.size === 0) {
+        notifiedOrderIdsRef.current = new Set(safeOrders.map((order) => String(order.id)));
+      }
+      
       setProducts(Object.values(menuData || {}));
-      setOrders(Array.isArray(ordersData) ? ordersData : []);
+      setOrders(safeOrders);
       
       try {
         const stats = await statsRes.json();
-        setStatsData(stats || buildStatsFromOrders(Array.isArray(ordersData) ? ordersData : []));
+        setStatsData(stats || buildStatsFromOrders(safeOrders));
       } catch {
-        setStatsData(buildStatsFromOrders(Array.isArray(ordersData) ? ordersData : []));
+        setStatsData(buildStatsFromOrders(safeOrders));
       }
     } catch (error) {
       console.error('Ma’lumotlarni yuklashda xato:', error);
@@ -549,7 +586,15 @@ export default function App() {
       setStreamStatus('Real-time ulangan');
     };
     
-    eventSource.onmessage = () => {
+    eventSource.onmessage = (event) => {
+      try {
+        const parsed = JSON.parse(event.data);
+        if (parsed?.type === 'order_created') {
+          loadData({ playSoundForNew: true });
+          return;
+        }
+      } catch {}
+      
       loadData();
     };
     
@@ -572,11 +617,26 @@ export default function App() {
   );
 }, [orders, search]);
 
+const activeOrders = useMemo(
+  () => filteredOrders.filter((o) => o.status !== 'Yetkazildi'),
+  [filteredOrders]
+);
+
+const historyOrders = useMemo(
+  () => filteredOrders.filter((o) => o.status === 'Yetkazildi'),
+  [filteredOrders]
+);
+
+const currentOrders = useMemo(
+  () => (orderTab === 'active' ? activeOrders : historyOrders),
+  [orderTab, activeOrders, historyOrders]
+);
+
 useEffect(() => {
   setOrderPage(1);
-}, [search]);
+}, [search, orderTab]);
 
-const totalOrderPages = Math.max(1, Math.ceil(filteredOrders.length / ORDERS_PER_PAGE));
+const totalOrderPages = Math.max(1, Math.ceil(currentOrders.length / ORDERS_PER_PAGE));
 
 useEffect(() => {
   if (orderPage > totalOrderPages) {
@@ -587,8 +647,8 @@ useEffect(() => {
 const paginatedOrders = useMemo(() => {
   const startIndex = (orderPage - 1) * ORDERS_PER_PAGE;
   const endIndex = startIndex + ORDERS_PER_PAGE;
-  return filteredOrders.slice(startIndex, endIndex);
-}, [filteredOrders, orderPage]);
+  return currentOrders.slice(startIndex, endIndex);
+}, [currentOrders, orderPage]);
 
 const categories = [...new Set(products.map((p) => p.category).filter(Boolean))];
 const dailyStats = useMemo(() => buildDailyStats(orders), [orders]);
@@ -698,6 +758,15 @@ function handleImageFileChange(file) {
   reader.readAsDataURL(file);
 }
 
+function handleLogout() {
+  localStorage.removeItem('admin_auth');
+  setIsAuth(false);
+}
+
+if (!isAuth) {
+  return <Login onLogin={() => setIsAuth(true)} />;
+}
+
 return (
   <div
   style={{
@@ -748,10 +817,36 @@ return (
   </div>
   
   <div style={{ display: 'grid', gap: 8 }}>
-  <SidebarItem active={page === 'dashboard'} icon={LayoutDashboard} label="Dashboard" onClick={() => setPage('dashboard')} />
-  <SidebarItem active={page === 'orders'} icon={ShoppingBag} label="Buyurtmalar" onClick={() => setPage('orders')} />
-  <SidebarItem active={page === 'products'} icon={Package} label="Mahsulotlar" onClick={() => setPage('products')} />
-  <SidebarItem active={page === 'stats'} icon={BarChart3} label="Statistika" onClick={() => setPage('stats')} />
+  <SidebarItem
+  active={page === 'dashboard'}
+  icon={LayoutDashboard}
+  label="Dashboard"
+  onClick={() => setPage('dashboard')}
+  />
+  <SidebarItem
+  active={page === 'orders'}
+  icon={ShoppingBag}
+  label="Buyurtmalar"
+  onClick={() => setPage('orders')}
+  />
+  <SidebarItem
+  active={page === 'products'}
+  icon={Package}
+  label="Mahsulotlar"
+  onClick={() => setPage('products')}
+  />
+  <SidebarItem
+  active={page === 'stats'}
+  icon={BarChart3}
+  label="Statistika"
+  onClick={() => setPage('stats')}
+  />
+  <SidebarItem
+  active={false}
+  icon={LogOut}
+  label="Logout"
+  onClick={handleLogout}
+  />
   </div>
   </Card>
   
@@ -805,13 +900,48 @@ return (
     </div>
     </div>
     
+    <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+    <Button
+    onClick={() => setOrderTab('active')}
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      background: orderTab === 'active' ? '#0f172a' : '#e2e8f0',
+      color: orderTab === 'active' ? '#fff' : '#0f172a',
+    }}
+    >
+    <ClipboardList size={16} />
+    Active Orders
+    </Button>
+    
+    <Button
+    onClick={() => setOrderTab('history')}
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      background: orderTab === 'history' ? '#0f172a' : '#e2e8f0',
+      color: orderTab === 'history' ? '#fff' : '#0f172a',
+    }}
+    >
+    <History size={16} />
+    History
+    </Button>
+    </div>
+    
     <div style={{ display: 'grid', gap: 16 }}>
     {paginatedOrders.map((order) => (
-      <OrderCard key={order.id} order={order} onStatusChange={handleStatusChange} />
+      <OrderCard
+      key={order.id}
+      order={order}
+      onStatusChange={handleStatusChange}
+      hideActions={orderTab === 'history'}
+      />
     ))}
     </div>
     
-    {filteredOrders.length === 0 && (
+    {currentOrders.length === 0 && (
       <div style={{ textAlign: 'center', padding: '30px 0', color: '#64748b' }}>
       Buyurtma topilmadi
       </div>
