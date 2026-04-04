@@ -23,6 +23,7 @@ import {
     getOrderById,
     updateOrderStatus,
     updateOrderAdminMessages,
+    deleteOrder,
     getTodayStats,
     getAllOrders
 } from './orders.js';
@@ -1023,6 +1024,25 @@ function buildAdminText(order) {
             return res.json(updated);
         } catch (error) {
             return res.status(404).json({ error: error.message });
+        }
+    });
+    
+    app.delete('/api/orders/:id', async (req, res) => {
+        const id = req.params.id;
+        
+        try {
+            const order = getOrderById(id);
+            
+            if (!order) {
+                return res.status(404).json({ error: 'Buyurtma topilmadi' });
+            }
+            
+            await deleteOrder(id);
+            sendSseEvent('order_deleted', { id });
+            
+            return res.json({ success: true });
+        } catch (error) {
+            return res.status(500).json({ error: error.message });
         }
     });
     

@@ -109,6 +109,21 @@ export async function updateOrderAdminMessages(id, data = {}) {
     return order;
 }
 
+export async function deleteOrder(id) {
+    const order = getOrderById(id);
+    
+    if (!order) {
+        throw new Error('Buyurtma topilmadi');
+    }
+    
+    const collection = await getOrdersCollection();
+    await collection.deleteOne({ id: String(id) });
+    
+    ordersCache = ordersCache.filter((item) => String(item.id) !== String(id));
+    
+    return order;
+}
+
 export function getTodayStats(timeZone = 'Asia/Tashkent') {
     const now = new Date();
     
