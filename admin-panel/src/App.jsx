@@ -28,6 +28,7 @@ import {
   LogOut,
   History,
   ClipboardList,
+  Trash2,
 } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -251,7 +252,7 @@ function getLocationData(order) {
   };
 }
 
-function OrderCard({ order, onStatusChange, hideActions = false }) {
+function OrderCard({ order, onStatusChange, onDeleteOrder, hideActions = false }) {
   const items = typeof order.cartText === 'string'
   ? order.cartText
   .split('\n')
@@ -352,7 +353,7 @@ function OrderCard({ order, onStatusChange, hideActions = false }) {
     </div>
     </div>
     
-    {!hideActions && (
+    {!hideActions ? (
       <>
       <Button
       onClick={() => onStatusChange(order.id, 'Qabul qilindi')}
@@ -378,6 +379,20 @@ function OrderCard({ order, onStatusChange, hideActions = false }) {
       <Truck size={16} /> Yetkazildi
       </Button>
       </>
+    ) : (
+      <Button
+      onClick={() => onDeleteOrder(order.id)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        background: '#fee2e2',
+        color: '#991b1b',
+      }}
+      >
+      <Trash2 size={16} /> O‘chirish
+      </Button>
     )}
     </div>
     </div>
@@ -667,6 +682,21 @@ async function handleStatusChange(id, status) {
   }
 }
 
+async function handleDeleteOrder(id) {
+  const ok = window.confirm("Rostdan ham bu buyurtmani o‘chirmoqchimisiz?");
+  if (!ok) return;
+  
+  try {
+    await fetch(`${API}/orders/${id}`, {
+      method: 'DELETE',
+    });
+    
+    await loadData();
+  } catch (error) {
+    console.error('Buyurtmani o‘chirishda xato:', error);
+  }
+}
+
 function openAdd() {
   setEditingId(null);
   setImageMode('url');
@@ -885,7 +915,12 @@ return (
     <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16 }}>So‘nggi buyurtmalar</div>
     <div style={{ display: 'grid', gap: 16 }}>
     {filteredOrders.slice(0, 3).map((order) => (
-      <OrderCard key={order.id} order={order} onStatusChange={handleStatusChange} />
+      <OrderCard
+      key={order.id}
+      order={order}
+      onStatusChange={handleStatusChange}
+      onDeleteOrder={handleDeleteOrder}
+      />
     ))}
     </div>
     </Card>
@@ -936,6 +971,7 @@ return (
       key={order.id}
       order={order}
       onStatusChange={handleStatusChange}
+      onDeleteOrder={handleDeleteOrder}
       hideActions={orderTab === 'history'}
       />
     ))}
