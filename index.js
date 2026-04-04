@@ -227,6 +227,10 @@ function getButtonsByStatus(order) {
     return undefined;
 }
 
+function getDeliveryTypeText(deliveryType) {
+    return deliveryType === 'pickup' ? '📦 O‘zi olib ketadi' : '🚚 Yetkazib berish';
+}
+
 function buildAdminText(order) {
     const locationLine = order.location?.text
     ? `📍 Manzil: ${order.location.text}`
@@ -239,6 +243,7 @@ function buildAdminText(order) {
             '',
             `🆔 Buyurtma ID: ${order.id}`,
             `📌 Status: ${order.status}`,
+            `🚚 Yetkazish turi: ${getDeliveryTypeText(order.deliveryType)}`,
             `👤 Ism: ${order.name}`,
             `📞 Telefon: ${order.phone}`,
             `👤 Telegram: ${order.telegramName}`,
@@ -413,6 +418,7 @@ function buildAdminText(order) {
             name: ctx.session.orderData.name,
             phone: ctx.session.orderData.phone,
             username: ctx.session.orderData.username,
+            deliveryType: ctx.session.orderData.deliveryType || 'delivery',
             telegramName: [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || 'Noma’lum',
             userId: ctx.from.id,
             chatId: ctx.chat.id,
@@ -434,6 +440,7 @@ function buildAdminText(order) {
             '✅ Buyurtma qabul qilindi!',
             '',
             `🆔 Buyurtma ID: ${order.id}`,
+            `🚚 Yetkazish turi: ${getDeliveryTypeText(order.deliveryType)}`,
             `👤 Ism: ${order.name}`,
             `📞 Telefon: ${order.phone}`,
             locationNoticeText,
@@ -640,6 +647,34 @@ function buildAdminText(order) {
         return renderCategories(ctx);
     });
     
+    bot.hears('🚚 Yetkazib berish', (ctx) => {
+        if (ctx.session.step !== 'delivery_type') return;
+        
+        ctx.session.orderData.deliveryType = 'delivery';
+        ctx.session.step = 'phone';
+        
+        return ctx.reply(
+            '📱 Telefon raqamingizni yuboring:',
+            Markup.keyboard([
+                [Markup.button.contactRequest('📱 Telefon yuborish')]
+            ]).resize().oneTime()
+        );
+    });
+    
+    bot.hears('📦 O‘zim olib ketaman', (ctx) => {
+        if (ctx.session.step !== 'delivery_type') return;
+        
+        ctx.session.orderData.deliveryType = 'pickup';
+        ctx.session.step = 'phone';
+        
+        return ctx.reply(
+            '📱 Telefon raqamingizni yuboring:',
+            Markup.keyboard([
+                [Markup.button.contactRequest('📱 Telefon yuborish')]
+            ]).resize().oneTime()
+        );
+    });
+    
     bot.action('back_to_categories', async (ctx) => {
         await ctx.answerCbQuery();
         ctx.session.currentCategory = null;
@@ -773,16 +808,19 @@ function buildAdminText(order) {
         
         ctx.session.orderData = {
             name: fullName || 'Noma’lum',
-            username: ctx.from.username || ''
+            username: ctx.from.username || '',
+            deliveryType: null
         };
         
-        ctx.session.step = 'phone';
+        ctx.session.step = 'delivery_type';
         
         await ctx.answerCbQuery();
+        
         return ctx.reply(
-            '📱 Telefon raqamingizni yuboring:',
+            "🚚 Buyurtma qanday bo‘ladi?",
             Markup.keyboard([
-                [Markup.button.contactRequest('📱 Telefon yuborish')]
+                ['🚚 Yetkazib berish'],
+                ['📦 O‘zim olib ketaman']
             ]).resize().oneTime()
         );
     });
@@ -791,6 +829,15 @@ function buildAdminText(order) {
         if (ctx.session.step !== 'phone') return;
         
         ctx.session.orderData.phone = ctx.message.contact.phone_number;
+        
+        if (ctx.session.orderData.deliveryType === 'pickup') {
+            return finalizeOrder(
+                ctx,
+                { text: "O‘zi olib ketadi" },
+                "📦 O‘zi olib ketadi"
+            );
+        }
+        
         ctx.session.step = 'address';
         
         return ctx.reply(
