@@ -45,6 +45,7 @@ const statusMap = {
   'Qabul qilindi': { label: 'Qabul qilindi', bg: '#fef3c7', color: '#b45309' },
   'Tayyor': { label: 'Tayyor', bg: '#ede9fe', color: '#6d28d9' },
   'Yetkazildi': { label: 'Yetkazildi', bg: '#d1fae5', color: '#047857' },
+  'Bekor qilindi': { label: 'Bekor qilindi', bg: '#fee2e2', color: '#b91c1c' },
 };
 
 function formatPrice(value) {
@@ -814,6 +815,7 @@ function PaymentInfoBox({ order }) {
     const acceptedOrders = orders.filter((o) => o.status === 'Qabul qilindi').length;
     const readyOrders = orders.filter((o) => o.status === 'Tayyor').length;
     const deliveredOrders = orders.filter((o) => o.status === 'Yetkazildi').length;
+    const cancelledOrders = orders.filter((o) => o.status === 'Bekor qilindi').length;
     const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total || 0), 0);
     const cashRevenue = orders
     .filter((o) => (o.paymentMethod || 'cash') === 'cash')
@@ -829,6 +831,7 @@ function PaymentInfoBox({ order }) {
       acceptedOrders,
       readyOrders,
       deliveredOrders,
+      cancelledOrders,
       totalRevenue,
       cashRevenue,
       clickRevenue,
@@ -853,6 +856,7 @@ function PaymentInfoBox({ order }) {
           clickRevenue: 0,
           paidOrders: 0,
           pendingPaymentOrders: 0,
+          cancelledOrders: 0,
           newOrders: 0,
           acceptedOrders: 0,
           readyOrders: 0,
@@ -1057,11 +1061,11 @@ function PaymentInfoBox({ order }) {
     }, [orders, search, paymentFilter, paymentStatusFilter]);
     
     const activeOrders = useMemo(
-      () => filteredOrders.filter((o) => o.status !== 'Yetkazildi'),
+      () => filteredOrders.filter((o) => o.status !== 'Yetkazildi' && o.status !== 'Bekor qilindi'),
       [filteredOrders]
     );
     const historyOrders = useMemo(
-      () => filteredOrders.filter((o) => o.status === 'Yetkazildi'),
+      () => filteredOrders.filter((o) => o.status === 'Yetkazildi' || o.status === 'Bekor qilindi'),
       [filteredOrders]
     );
     const currentOrders = useMemo(
@@ -1372,7 +1376,7 @@ function PaymentInfoBox({ order }) {
         <div style={{ padding: 18, borderRadius: 20, background: '#eff6ff' }}>
         <div style={{ color: '#1d4ed8', fontWeight: 700, fontSize: 13 }}>Aktiv buyurtmalar</div>
         <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800, color: '#0f172a' }}>
-        {orders.filter((o) => o.status !== 'Yetkazildi').length}
+        {orders.filter((o) => o.status !== 'Yetkazildi' && o.status !== 'Bekor qilindi').length}
         </div>
         </div>
         <div style={{ padding: 18, borderRadius: 20, background: '#ecfdf5' }}>
@@ -1386,6 +1390,10 @@ function PaymentInfoBox({ order }) {
         <div style={{ padding: 18, borderRadius: 20, background: '#f5f3ff' }}>
         <div style={{ color: '#6d28d9', fontWeight: 700, fontSize: 13 }}>To'langanlar</div>
         <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800, color: '#0f172a' }}>{statsData?.paidOrders ?? 0}</div>
+        </div>
+        <div style={{ padding: 18, borderRadius: 20, background: '#fee2e2' }}>
+        <div style={{ color: '#b91c1c', fontWeight: 700, fontSize: 13 }}>Bekor qilingan</div>
+        <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800, color: '#0f172a' }}>{statsData?.cancelledOrders ?? 0}</div>
         </div>
         </div>
         </Card>
