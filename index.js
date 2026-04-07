@@ -425,7 +425,7 @@ function buildAdminText(order) {
             description: [
                 `Buyurtma ID: ${order.id}`,
                 `Yetkazish turi: ${getDeliveryTypeText(order.deliveryType)}`,
-                `To‘lov: Click`
+                `To‘lov turi: Click`
             ].join('\n'),
             payload: `order_${order.id}`,
             provider_token: CLICK_PROVIDER_TOKEN,
@@ -550,42 +550,12 @@ function buildAdminText(order) {
                 await sendClickInvoice(ctx, order);
             } catch (error) {
                 console.log('Click invoice yuborishda xato:', error.message);
-                await ctx.reply("❌ Click invoice yuborilmadi. Provider tokenni tekshiring.");
+                await ctx.reply("❌ Click invoice yuborilmadi. Tokenni yoki BotFather ulanishini tekshiring.");
             }
-        }
-        
-        return;
-    }
-    
-    async function sendTelegramMessage(chatId, text) {
-        if (!BOT_TOKEN || !chatId) return;
-        
-        try {
-            const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: chatId, text })
-            });
-            
-            const data = await response.json();
-            if (!data.ok) {
-                console.log('Telegram API xato:', data.description);
-            }
-        } catch (error) {
-            console.log('Telegramga xabar yuborishda xato:', error.message);
         }
     }
     
-    /* BOT */
-    
-    bot.start((ctx) => {
-        clearUnavailableCartItems(ctx.session.cart);
-        ctx.session.step = null;
-        ctx.session.orderData = {};
-        ctx.session.currentCategory = null;
-        
-        return ctx.reply('Assalomu alaykum! Restoran botga xush kelibsiz.', mainKeyboard);
-    });
+    /* TELEGRAM PAYMENTS */
     
     bot.on('pre_checkout_query', async (ctx) => {
         try {
@@ -635,6 +605,36 @@ function buildAdminText(order) {
         } catch (error) {
             console.log('Successful payment xato:', error.message);
         }
+    });
+    
+    async function sendTelegramMessage(chatId, text) {
+        if (!BOT_TOKEN || !chatId) return;
+        
+        try {
+            const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: chatId, text })
+            });
+            
+            const data = await response.json();
+            if (!data.ok) {
+                console.log('Telegram API xato:', data.description);
+            }
+        } catch (error) {
+            console.log('Telegramga xabar yuborishda xato:', error.message);
+        }
+    }
+    
+    /* BOT */
+    
+    bot.start((ctx) => {
+        clearUnavailableCartItems(ctx.session.cart);
+        ctx.session.step = null;
+        ctx.session.orderData = {};
+        ctx.session.currentCategory = null;
+        
+        return ctx.reply('Assalomu alaykum! Restoran botga xush kelibsiz.', mainKeyboard);
     });
     
     bot.command('list', async (ctx) => {
@@ -1319,12 +1319,10 @@ function buildAdminText(order) {
         }
         
         try {
-            await bot.launch({
-                dropPendingUpdates: true
-            });
-            
+            await bot.launch();
             console.log('✅ Bot ishga tushdi');
             console.log('ADMIN_CHAT_ID:', ADMIN_CHAT_ID || 'yo‘q');
+            console.log('CLICK_PROVIDER_TOKEN:', CLICK_PROVIDER_TOKEN ? 'mavjud' : 'yo‘q');
             console.log('WORK HOURS:', `${WORK_START} - ${WORK_END}`);
             console.log('CURRENT TIME:', getCurrentTimeText());
             console.log('IS OPEN:', isRestaurantOpen());
