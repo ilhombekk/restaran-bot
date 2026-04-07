@@ -402,7 +402,10 @@ function InfoLine({ icon: Icon, text, link }) {
 function PaymentInfoBox({ order }) {
   const isClick = order.paymentMethod === 'click';
   const isPaid = order.paymentStatus === 'paid';
-  const isPending = !order.paymentStatus || order.paymentStatus === 'pending';
+  const isFailed = order.paymentStatus === 'failed';
+  const isCancelled = order.status === 'Bekor qilindi';
+  // pending: status yo'q, yoki 'pending', lekin bekor qilinmagan
+  const isPending = !isCancelled && !isPaid && !isFailed;
   
   return (
     <div
@@ -437,13 +440,7 @@ function PaymentInfoBox({ order }) {
     )}
     <div>
     <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>To'lov usuli</div>
-    <div
-    style={{
-      fontSize: 14,
-      fontWeight: 800,
-      color: isClick ? '#1d4ed8' : '#047857',
-    }}
-    >
+    <div style={{ fontSize: 14, fontWeight: 800, color: isClick ? '#1d4ed8' : '#047857' }}>
     {isClick ? "Click orqali to'lov" : "Naqd pul to'lov"}
     </div>
     </div>
@@ -458,16 +455,16 @@ function PaymentInfoBox({ order }) {
         gap: 10,
         padding: '12px 14px',
         borderRadius: 14,
-        background: isPaid ? '#ecfdf5' : isPending ? '#fffbeb' : '#fef2f2',
-        border: `1px solid ${isPaid ? '#a7f3d0' : isPending ? '#fde68a' : '#fecaca'}`,
+        background: isPaid ? '#ecfdf5' : (isCancelled || isFailed) ? '#fef2f2' : '#fffbeb',
+        border: `1px solid ${isPaid ? '#a7f3d0' : (isCancelled || isFailed) ? '#fecaca' : '#fde68a'}`,
       }}
       >
       {isPaid ? (
         <CheckCircle2 size={16} color="#047857" />
-      ) : isPending ? (
-        <Clock3 size={16} color="#b45309" />
-      ) : (
+      ) : (isCancelled || isFailed) ? (
         <X size={16} color="#b91c1c" />
+      ) : (
+        <Clock3 size={16} color="#b45309" />
       )}
       <div>
       <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>To'lov holati</div>
@@ -475,14 +472,16 @@ function PaymentInfoBox({ order }) {
       style={{
         fontSize: 14,
         fontWeight: 800,
-        color: isPaid ? '#047857' : isPending ? '#b45309' : '#b91c1c',
+        color: isPaid ? '#047857' : (isCancelled || isFailed) ? '#b91c1c' : '#b45309',
       }}
       >
       {isPaid
         ? "Click orqali to'langan ✓"
-        : isPending
-        ? "To'lov kutilmoqda..."
-        : "To'lov amalga oshmadi"}
+        : isCancelled
+        ? "Buyurtma bekor — to'lov amalga oshmadi ✗"
+        : isFailed
+        ? "To'lov amalga oshmadi ✗"
+        : "To'lov kutilmoqda..."}
         </div>
         </div>
         </div>
