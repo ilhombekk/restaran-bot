@@ -22,6 +22,7 @@ import {
     addOrder,
     getOrderById,
     updateOrderStatus,
+    updateOrderPayment,
     updateOrderAdminMessages,
     deleteOrder,
     getTodayStats,
@@ -231,6 +232,16 @@ function getDeliveryTypeText(deliveryType) {
     return deliveryType === 'pickup' ? '📦 O‘zi olib ketadi' : '🚚 Yetkazib berish';
 }
 
+function getPaymentMethodText(paymentMethod) {
+    return paymentMethod === 'click' ? '💳 Click' : '💵 Naqd';
+}
+
+function getPaymentStatusText(paymentStatus) {
+    if (paymentStatus === 'paid') return '✅ To‘langan';
+    if (paymentStatus === 'failed') return '❌ To‘lov muvaffaqiyatsiz';
+    return '⏳ To‘lov kutilmoqda';
+}
+
 function buildAdminText(order) {
     const locationLine = order.location?.text
     ? `📍 Manzil: ${order.location.text}`
@@ -244,6 +255,8 @@ function buildAdminText(order) {
             `🆔 Buyurtma ID: ${order.id}`,
             `📌 Status: ${order.status}`,
             `🚚 Yetkazish turi: ${getDeliveryTypeText(order.deliveryType)}`,
+            `💳 To‘lov turi: ${getPaymentMethodText(order.paymentMethod)}`,
+            `💰 To‘lov holati: ${getPaymentStatusText(order.paymentStatus)}`,
             `👤 Ism: ${order.name}`,
             `📞 Telefon: ${order.phone}`,
             `👤 Telegram: ${order.telegramName}`,
@@ -254,6 +267,8 @@ function buildAdminText(order) {
             '',
             order.cartText,
             `💰 Jami: ${formatPrice(order.total)}`,
+            ...(order.clickTransactionId ? [`🧾 Click Transaction: ${order.clickTransactionId}`] : []),
+            ...(order.paidAt ? [`🕒 To‘langan vaqt: ${new Date(order.paidAt).toLocaleString('uz-UZ', { timeZone: TIME_ZONE })}`] : []),
             '',
             `🕒 Buyurtma vaqti: ${new Date(order.createdAt).toLocaleString('uz-UZ', { timeZone: TIME_ZONE })}`
         ].join('\n');
@@ -427,6 +442,10 @@ function buildAdminText(order) {
             cartText,
             total,
             status: 'Yangi buyurtma',
+            paymentMethod: 'cash',
+            paymentStatus: 'pending',
+            paidAt: null,
+            clickTransactionId: null,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             adminMessageId: null,
@@ -441,6 +460,8 @@ function buildAdminText(order) {
             '',
             `🆔 Buyurtma ID: ${order.id}`,
             `🚚 Yetkazish turi: ${getDeliveryTypeText(order.deliveryType)}`,
+            `💳 To‘lov turi: ${getPaymentMethodText(order.paymentMethod)}`,
+            `💰 To‘lov holati: ${getPaymentStatusText(order.paymentStatus)}`,
             `👤 Ism: ${order.name}`,
             `📞 Telefon: ${order.phone}`,
             locationNoticeText,
@@ -632,7 +653,10 @@ function buildAdminText(order) {
             `👨‍🍳 Tayyor: ${stats.readyOrders}`,
             `🚚 Yetkazilgan: ${stats.deliveredOrders}`,
             `💰 Bugungi jami summa: ${formatPrice(stats.totalRevenue)}`,
-            `💵 Yetkazilganlar summasi: ${formatPrice(stats.deliveredRevenue)}`,
+            `💵 Naqd tushum: ${formatPrice(stats.cashRevenue)}`,
+            `💳 Click tushum: ${formatPrice(stats.clickRevenue)}`,
+            `✅ To‘langan buyurtmalar: ${stats.paidOrders}`,
+            `⏳ To‘lov kutilayotganlar: ${stats.pendingPaymentOrders}`,
             '',
             `📦 Umumiy buyurtmalar soni: ${allOrders.length}`,
             '',
@@ -645,34 +669,6 @@ function buildAdminText(order) {
         clearUnavailableCartItems(ctx.session.cart);
         ctx.session.currentCategory = null;
         return renderCategories(ctx);
-    });
-    
-    bot.hears('🚚 Yetkazib berish', (ctx) => {
-        if (ctx.session.step !== 'delivery_type') return;
-        
-        ctx.session.orderData.deliveryType = 'delivery';
-        ctx.session.step = 'phone';
-        
-        return ctx.reply(
-            '📱 Telefon raqamingizni yuboring:',
-            Markup.keyboard([
-                [Markup.button.contactRequest('📱 Telefon yuborish')]
-            ]).resize().oneTime()
-        );
-    });
-    
-    bot.hears('📦 O‘zim olib ketaman', (ctx) => {
-        if (ctx.session.step !== 'delivery_type') return;
-        
-        ctx.session.orderData.deliveryType = 'pickup';
-        ctx.session.step = 'phone';
-        
-        return ctx.reply(
-            '📱 Telefon raqamingizni yuboring:',
-            Markup.keyboard([
-                [Markup.button.contactRequest('📱 Telefon yuborish')]
-            ]).resize().oneTime()
-        );
     });
     
     bot.action('back_to_categories', async (ctx) => {
@@ -821,6 +817,34 @@ function buildAdminText(order) {
             Markup.keyboard([
                 ['🚚 Yetkazib berish'],
                 ['📦 O‘zim olib ketaman']
+            ]).resize().oneTime()
+        );
+    });
+    
+    bot.hears('🚚 Yetkazib berish', (ctx) => {
+        if (ctx.session.step !== 'delivery_type') return;
+        
+        ctx.session.orderData.deliveryType = 'delivery';
+        ctx.session.step = 'phone';
+        
+        return ctx.reply(
+            '📱 Telefon raqamingizni yuboring:',
+            Markup.keyboard([
+                [Markup.button.contactRequest('📱 Telefon yuborish')]
+            ]).resize().oneTime()
+        );
+    });
+    
+    bot.hears('📦 O‘zim olib ketaman', (ctx) => {
+        if (ctx.session.step !== 'delivery_type') return;
+        
+        ctx.session.orderData.deliveryType = 'pickup';
+        ctx.session.step = 'phone';
+        
+        return ctx.reply(
+            '📱 Telefon raqamingizni yuboring:',
+            Markup.keyboard([
+                [Markup.button.contactRequest('📱 Telefon yuborish')]
             ]).resize().oneTime()
         );
     });
@@ -1074,6 +1098,27 @@ function buildAdminText(order) {
         }
     });
     
+    app.put('/api/orders/:id/payment', async (req, res) => {
+        const id = req.params.id;
+        const { paymentMethod, paymentStatus, paidAt, clickTransactionId } = req.body;
+        
+        try {
+            const updated = await updateOrderPayment(id, {
+                paymentMethod,
+                paymentStatus,
+                paidAt,
+                clickTransactionId
+            });
+            
+            sendSseEvent('order_updated', updated);
+            await syncAdminOrderMessage(updated);
+            
+            return res.json(updated);
+        } catch (error) {
+            return res.status(404).json({ error: error.message });
+        }
+    });
+    
     app.delete('/api/orders/:id', async (req, res) => {
         const id = req.params.id;
         
@@ -1102,6 +1147,14 @@ function buildAdminText(order) {
         const readyOrders = orders.filter((o) => o.status === 'Tayyor').length;
         const deliveredOrders = orders.filter((o) => o.status === 'Yetkazildi').length;
         const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+        const cashRevenue = orders
+        .filter((o) => (o.paymentMethod || 'cash') === 'cash')
+        .reduce((sum, o) => sum + Number(o.total || 0), 0);
+        const clickRevenue = orders
+        .filter((o) => o.paymentMethod === 'click')
+        .reduce((sum, o) => sum + Number(o.total || 0), 0);
+        const paidOrders = orders.filter((o) => (o.paymentStatus || 'pending') === 'paid').length;
+        const pendingPaymentOrders = orders.filter((o) => (o.paymentStatus || 'pending') === 'pending').length;
         
         return res.json({
             totalOrders,
@@ -1109,7 +1162,11 @@ function buildAdminText(order) {
             acceptedOrders,
             readyOrders,
             deliveredOrders,
-            totalRevenue
+            totalRevenue,
+            cashRevenue,
+            clickRevenue,
+            paidOrders,
+            pendingPaymentOrders
         });
     });
     

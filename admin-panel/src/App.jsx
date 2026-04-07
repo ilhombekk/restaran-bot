@@ -29,6 +29,8 @@ import {
   History,
   ClipboardList,
   Trash2,
+  CreditCard,
+  Banknote,
 } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -87,6 +89,16 @@ function playNotificationSound() {
     const audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
     audio.play().catch(() => {});
   } catch {}
+}
+
+function getPaymentMethodText(paymentMethod) {
+  return paymentMethod === 'click' ? 'Click' : 'Naqd';
+}
+
+function getPaymentStatusText(paymentStatus) {
+  if (paymentStatus === 'paid') return 'To‘langan';
+  if (paymentStatus === 'failed') return 'Muvaffaqiyatsiz';
+  return 'Kutilmoqda';
 }
 
 function Card({ children, style = {} }) {
@@ -216,6 +228,63 @@ function Badge({ status }) {
   );
 }
 
+function PaymentBadge({ paymentStatus }) {
+  const isPaid = paymentStatus === 'paid';
+  const isFailed = paymentStatus === 'failed';
+  
+  let bg = '#fef3c7';
+  let color = '#b45309';
+  let label = 'Kutilmoqda';
+  
+  if (isPaid) {
+    bg = '#d1fae5';
+    color = '#047857';
+    label = 'To‘langan';
+  }
+  
+  if (isFailed) {
+    bg = '#fee2e2';
+    color = '#b91c1c';
+    label = 'Muvaffaqiyatsiz';
+  }
+  
+  return (
+    <span
+    style={{
+      display: 'inline-block',
+      padding: '6px 10px',
+      borderRadius: 999,
+      background: bg,
+      color,
+      fontSize: 12,
+      fontWeight: 700,
+    }}
+    >
+    {label}
+    </span>
+  );
+}
+
+function MethodBadge({ paymentMethod }) {
+  const isClick = paymentMethod === 'click';
+  
+  return (
+    <span
+    style={{
+      display: 'inline-block',
+      padding: '6px 10px',
+      borderRadius: 999,
+      background: isClick ? '#dbeafe' : '#f3f4f6',
+      color: isClick ? '#1d4ed8' : '#334155',
+      fontSize: 12,
+      fontWeight: 700,
+    }}
+    >
+    {isClick ? 'Click' : 'Naqd'}
+    </span>
+  );
+}
+
 function getLocationData(order) {
   const lat =
   order?.location?.lat ??
@@ -252,7 +321,13 @@ function getLocationData(order) {
   };
 }
 
-function OrderCard({ order, onStatusChange, onDeleteOrder, hideActions = false }) {
+function OrderCard({
+  order,
+  onStatusChange,
+  onDeleteOrder,
+  onPaymentUpdate,
+  hideActions = false
+}) {
   const items = typeof order.cartText === 'string'
   ? order.cartText
   .split('\n')
@@ -265,11 +340,13 @@ function OrderCard({ order, onStatusChange, onDeleteOrder, hideActions = false }
   return (
     <motion.div layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
     <Card>
-    <div style={{ display: 'grid', gap: 20, gridTemplateColumns: '1.3fr 280px' }}>
+    <div style={{ display: 'grid', gap: 20, gridTemplateColumns: '1.3fr 300px' }}>
     <div>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
     <div style={{ fontSize: 20, fontWeight: 700 }}>Buyurtma #{order.id}</div>
     <Badge status={order.status} />
+    <MethodBadge paymentMethod={order.paymentMethod} />
+    <PaymentBadge paymentStatus={order.paymentStatus} />
     </div>
     
     <div style={{ marginTop: 16, display: 'grid', gap: 10, color: '#475569', fontSize: 14 }}>
@@ -288,6 +365,16 @@ function OrderCard({ order, onStatusChange, onDeleteOrder, hideActions = false }
     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
     <Clock3 size={16} /> {formatDateTime(order.createdAt)}
     </div>
+    
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+    <CreditCard size={16} /> {getPaymentMethodText(order.paymentMethod)} / {getPaymentStatusText(order.paymentStatus)}
+    </div>
+    
+    {order.paidAt ? (
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      <Banknote size={16} /> To‘langan vaqt: {formatDateTime(order.paidAt)}
+      </div>
+    ) : null}
     
     <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
     <MapPin size={16} style={{ marginTop: 2, flexShrink: 0 }} />
@@ -353,6 +440,65 @@ function OrderCard({ order, onStatusChange, onDeleteOrder, hideActions = false }
     </div>
     </div>
     
+    <div
+    style={{
+      borderRadius: 18,
+      padding: 14,
+      background: '#f8fafc',
+      display: 'grid',
+      gap: 10
+    }}
+    >
+    <div style={{ fontWeight: 700, color: '#0f172a' }}>To‘lov boshqaruvi</div>
+    
+    <Button
+    onClick={() =>
+      onPaymentUpdate(order.id, {
+        paymentMethod: 'cash',
+        paymentStatus: 'paid',
+        paidAt: new Date().toISOString()
+      })
+    }
+    style={{
+      background: '#ecfdf5',
+      color: '#047857'
+    }}
+    >
+    💵 Naqd to‘landi
+    </Button>
+    
+    <Button
+    onClick={() =>
+      onPaymentUpdate(order.id, {
+        paymentMethod: 'click',
+        paymentStatus: 'paid',
+        paidAt: new Date().toISOString()
+      })
+    }
+    style={{
+      background: '#eff6ff',
+      color: '#1d4ed8'
+    }}
+    >
+    💳 Click to‘landi
+    </Button>
+    
+    <Button
+    onClick={() =>
+      onPaymentUpdate(order.id, {
+        paymentStatus: 'pending',
+        paidAt: null
+      })
+    }
+    style={{
+      background: '#fef3c7',
+      color: '#b45309'
+    }}
+    >
+    ⏳ To‘lov kutilmoqda
+    </Button>
+    </div>
+    
     {!hideActions ? (
       <>
       <Button
@@ -408,6 +554,14 @@ function buildStatsFromOrders(orders) {
   const readyOrders = orders.filter((o) => o.status === 'Tayyor').length;
   const deliveredOrders = orders.filter((o) => o.status === 'Yetkazildi').length;
   const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+  const cashRevenue = orders
+  .filter((o) => (o.paymentMethod || 'cash') === 'cash')
+  .reduce((sum, o) => sum + Number(o.total || 0), 0);
+  const clickRevenue = orders
+  .filter((o) => o.paymentMethod === 'click')
+  .reduce((sum, o) => sum + Number(o.total || 0), 0);
+  const paidOrders = orders.filter((o) => (o.paymentStatus || 'pending') === 'paid').length;
+  const pendingPaymentOrders = orders.filter((o) => (o.paymentStatus || 'pending') === 'pending').length;
   
   return {
     totalOrders,
@@ -416,6 +570,10 @@ function buildStatsFromOrders(orders) {
     readyOrders,
     deliveredOrders,
     totalRevenue,
+    cashRevenue,
+    clickRevenue,
+    paidOrders,
+    pendingPaymentOrders,
   };
 }
 
@@ -433,6 +591,10 @@ function buildDailyStats(orders) {
         totalOrders: 0,
         revenue: 0,
         deliveredRevenue: 0,
+        cashRevenue: 0,
+        clickRevenue: 0,
+        paidOrders: 0,
+        pendingPaymentOrders: 0,
         newOrders: 0,
         acceptedOrders: 0,
         readyOrders: 0,
@@ -443,6 +605,22 @@ function buildDailyStats(orders) {
     const item = map.get(key);
     item.totalOrders += 1;
     item.revenue += Number(order.total || 0);
+    
+    if ((order.paymentMethod || 'cash') === 'cash') {
+      item.cashRevenue += Number(order.total || 0);
+    }
+    
+    if (order.paymentMethod === 'click') {
+      item.clickRevenue += Number(order.total || 0);
+    }
+    
+    if ((order.paymentStatus || 'pending') === 'paid') {
+      item.paidOrders += 1;
+    }
+    
+    if ((order.paymentStatus || 'pending') === 'pending') {
+      item.pendingPaymentOrders += 1;
+    }
     
     if (order.status === 'Yangi buyurtma') item.newOrders += 1;
     if (order.status === 'Qabul qilindi') item.acceptedOrders += 1;
@@ -529,6 +707,10 @@ export default function App() {
     readyOrders: 0,
     deliveredOrders: 0,
     totalRevenue: 0,
+    cashRevenue: 0,
+    clickRevenue: 0,
+    paidOrders: 0,
+    pendingPaymentOrders: 0,
   });
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -628,7 +810,9 @@ export default function App() {
     String(order.id).includes(search) ||
     String(order.phone || '').includes(search) ||
     String(order.username || '').toLowerCase().includes(search.toLowerCase()) ||
-    String(order.location?.text || '').toLowerCase().includes(search.toLowerCase())
+    String(order.location?.text || '').toLowerCase().includes(search.toLowerCase()) ||
+    String(order.paymentMethod || '').toLowerCase().includes(search.toLowerCase()) ||
+    String(order.paymentStatus || '').toLowerCase().includes(search.toLowerCase())
   );
 }, [orders, search]);
 
@@ -679,6 +863,20 @@ async function handleStatusChange(id, status) {
     await loadData();
   } catch (error) {
     console.error('Statusni yangilashda xato:', error);
+  }
+}
+
+async function handlePaymentUpdate(id, payload) {
+  try {
+    await fetch(`${API}/orders/${id}/payment`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    
+    await loadData();
+  } catch (error) {
+    console.error('To‘lovni yangilashda xato:', error);
   }
 }
 
@@ -885,7 +1083,7 @@ return (
   <div>
   <div style={{ fontSize: 34, fontWeight: 800, color: '#0f172a' }}>Admin Panel</div>
   <div style={{ color: '#64748b', marginTop: 6 }}>
-  Buyurtmalar va mahsulotlar real ma’lumotlar bilan ishlayapti.
+  Buyurtmalar, mahsulotlar va to‘lovlar real ma’lumotlar bilan ishlayapti.
   </div>
   <div style={{ color: '#16a34a', marginTop: 6, fontSize: 13 }}>
   {streamStatus}
@@ -906,8 +1104,8 @@ return (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
   <StatCard title="Jami buyurtmalar" value={statsData?.totalOrders ?? 0} icon={ShoppingBag} helper="Barcha buyurtmalar" />
   <StatCard title="Yangi" value={statsData?.newOrders ?? 0} icon={Bell} helper="Yangi tushganlar" />
-  <StatCard title="Yetkazilgan" value={statsData?.deliveredOrders ?? 0} icon={Truck} helper="Yakunlanganlar" />
-  <StatCard title="Tushum" value={formatPrice(statsData?.totalRevenue ?? 0)} icon={BarChart3} helper="Umumiy summa" />
+  <StatCard title="Naqd tushum" value={formatPrice(statsData?.cashRevenue ?? 0)} icon={Banknote} helper="Cash" />
+  <StatCard title="Click tushum" value={formatPrice(statsData?.clickRevenue ?? 0)} icon={CreditCard} helper="Click" />
   </div>
   
   {page === 'dashboard' && (
@@ -920,6 +1118,7 @@ return (
       order={order}
       onStatusChange={handleStatusChange}
       onDeleteOrder={handleDeleteOrder}
+      onPaymentUpdate={handlePaymentUpdate}
       />
     ))}
     </div>
@@ -972,6 +1171,7 @@ return (
       order={order}
       onStatusChange={handleStatusChange}
       onDeleteOrder={handleDeleteOrder}
+      onPaymentUpdate={handlePaymentUpdate}
       hideActions={orderTab === 'history'}
       />
     ))}
@@ -1108,15 +1308,15 @@ return (
     </div>
     </div>
     <div style={{ padding: 18, borderRadius: 20, background: '#f8fafc' }}>
-    <div style={{ fontSize: 14, color: '#64748b' }}>Kategoriyalar</div>
+    <div style={{ fontSize: 14, color: '#64748b' }}>To‘langan buyurtmalar</div>
     <div style={{ marginTop: 10, fontSize: 28, fontWeight: 800 }}>
-    {categories.length}
+    {statsData?.paidOrders ?? 0}
     </div>
     </div>
     <div style={{ padding: 18, borderRadius: 20, background: '#f8fafc' }}>
-    <div style={{ fontSize: 14, color: '#64748b' }}>Mahsulotlar</div>
+    <div style={{ fontSize: 14, color: '#64748b' }}>To‘lov kutilmoqda</div>
     <div style={{ marginTop: 10, fontSize: 28, fontWeight: 800 }}>
-    {products.length}
+    {statsData?.pendingPaymentOrders ?? 0}
     </div>
     </div>
     </div>
@@ -1166,7 +1366,7 @@ return (
         </div>
         </div>
         
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
         <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
         <div style={{ fontSize: 13, color: '#64748b' }}>Kunlik jami zakaz</div>
         <div style={{ marginTop: 8, fontSize: 24, fontWeight: 800 }}>{day.totalOrders}</div>
@@ -1180,9 +1380,16 @@ return (
         </div>
         
         <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
-        <div style={{ fontSize: 13, color: '#64748b' }}>Yetkazilgan daromad</div>
+        <div style={{ fontSize: 13, color: '#64748b' }}>Naqd tushum</div>
         <div style={{ marginTop: 8, fontSize: 24, fontWeight: 800 }}>
-        {formatPrice(day.deliveredRevenue)}
+        {formatPrice(day.cashRevenue)}
+        </div>
+        </div>
+        
+        <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
+        <div style={{ fontSize: 13, color: '#64748b' }}>Click tushum</div>
+        <div style={{ marginTop: 8, fontSize: 24, fontWeight: 800 }}>
+        {formatPrice(day.clickRevenue)}
         </div>
         </div>
         </div>
@@ -1199,6 +1406,18 @@ return (
         </div>
         <div style={{ padding: 14, borderRadius: 16, background: '#d1fae5', color: '#047857', fontWeight: 700 }}>
         Yetkazildi: {day.deliveredOrders}
+        </div>
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 12 }}>
+        <div style={{ padding: 14, borderRadius: 16, background: '#ecfdf5', color: '#047857', fontWeight: 700 }}>
+        To‘langan: {day.paidOrders}
+        </div>
+        <div style={{ padding: 14, borderRadius: 16, background: '#fffbeb', color: '#b45309', fontWeight: 700 }}>
+        Kutilmoqda: {day.pendingPaymentOrders}
+        </div>
+        <div style={{ padding: 14, borderRadius: 16, background: '#f8fafc', color: '#0f172a', fontWeight: 700 }}>
+        Yetkazilgan daromad: {formatPrice(day.deliveredRevenue)}
         </div>
         </div>
         </div>

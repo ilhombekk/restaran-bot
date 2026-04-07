@@ -2,6 +2,17 @@ import { getOrdersCollection } from './db.js';
 
 let ordersCache = [];
 
+function normalizePaymentMethod(value) {
+    if (value === 'click') return 'click';
+    return 'cash';
+}
+
+function normalizePaymentStatus(value) {
+    if (value === 'paid') return 'paid';
+    if (value === 'failed') return 'failed';
+    return 'pending';
+}
+
 export async function initOrders() {
     const collection = await getOrdersCollection();
     const items = await collection.find({}).sort({ createdAt: -1 }).toArray();
@@ -14,11 +25,16 @@ export async function initOrders() {
         telegramName: item.telegramName || '',
         userId: item.userId,
         chatId: item.chatId,
+        deliveryType: item.deliveryType || 'delivery',
         location: item.location || null,
         cart: item.cart || {},
         cartText: item.cartText || '',
         total: Number(item.total || 0),
         status: item.status || 'Yangi buyurtma',
+        paymentMethod: normalizePaymentMethod(item.paymentMethod),
+        paymentStatus: normalizePaymentStatus(item.paymentStatus),
+        paidAt: item.paidAt || null,
+        clickTransactionId: item.clickTransactionId || null,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt || item.createdAt,
         adminMessageId: item.adminMessageId || null,
@@ -39,7 +55,12 @@ export function getOrderById(id) {
 export async function addOrder(order) {
     const newOrder = {
         ...order,
+        deliveryType: order.deliveryType || 'delivery',
         total: Number(order.total || 0),
+        paymentMethod: normalizePaymentMethod(order.paymentMethod),
+        paymentStatus: normalizePaymentStatus(order.paymentStatus),
+        paidAt: order.paidAt || null,
+        clickTransactionId: order.clickTransactionId || null,
         createdAt: order.createdAt || new Date().toISOString(),
         updatedAt: order.updatedAt || new Date().toISOString(),
         adminMessageId: order.adminMessageId || null,
@@ -69,6 +90,48 @@ export async function updateOrderStatus(id, status) {
         {
             $set: {
                 status: order.status,
+                updatedAt: order.updatedAt,
+            }
+        }
+    );
+    
+    return order;
+}
+
+export async function updateOrderPayment(id, data = {}) {
+    const order = getOrderById(id);
+    
+    if (!order) {
+        throw new Error('Buyurtma topilmadi');
+    }
+    
+    if (data.paymentMethod !== undefined) {
+        order.paymentMethod = normalizePaymentMethod(data.paymentMethod);
+    }
+    
+    if (data.paymentStatus !== undefined) {
+        order.paymentStatus = normalizePaymentStatus(data.paymentStatus);
+    }
+    
+    if (data.paidAt !== undefined) {
+        order.paidAt = data.paidAt || null;
+    }
+    
+    if (data.clickTransactionId !== undefined) {
+        order.clickTransactionId = data.clickTransactionId || null;
+    }
+    
+    order.updatedAt = new Date().toISOString();
+    
+    const collection = await getOrdersCollection();
+    await collection.updateOne(
+        { id: String(id) },
+        {
+            $set: {
+                paymentMethod: order.paymentMethod,
+                paymentStatus: order.paymentStatus,
+                paidAt: order.paidAt,
+                clickTransactionId: order.clickTransactionId,
                 updatedAt: order.updatedAt,
             }
         }
@@ -147,10 +210,22 @@ export function getTodayStats(timeZone = 'Asia/Tashkent') {
     const acceptedOrders = todayOrders.filter((o) => o.status === 'Qabul qilindi').length;
     const readyOrders = todayOrders.filter((o) => o.status === 'Tayyor').length;
     const deliveredOrders = todayOrders.filter((o) => o.status === 'Yetkazildi').length;
+    
     const totalRevenue = todayOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
     const deliveredRevenue = todayOrders
     .filter((o) => o.status === 'Yetkazildi')
     .reduce((sum, o) => sum + Number(o.total || 0), 0);
+    
+    const cashRevenue = todayOrders
+    .filter((o) => o.paymentMethod === 'cash')
+    .reduce((sum, o) => sum + Number(o.total || 0), 0);
+    
+    const clickRevenue = todayOrders
+    .filter((o) => o.paymentMethod === 'click')
+    .reduce((sum, o) => sum + Number(o.total || 0), 0);
+    
+    const paidOrders = todayOrders.filter((o) => o.paymentStatus === 'paid').length;
+    const pendingPaymentOrders = todayOrders.filter((o) => o.paymentStatus === 'pending').length;
     
     return {
         date: today,
@@ -161,5 +236,9 @@ export function getTodayStats(timeZone = 'Asia/Tashkent') {
         deliveredOrders,
         totalRevenue,
         deliveredRevenue,
+        cashRevenue,
+        clickRevenue,
+        paidOrders,
+        pendingPaymentOrders,
     };
 }
