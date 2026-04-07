@@ -246,26 +246,27 @@ function StatCard({ title, value, helper, icon: Icon, dark = false }) {
     style={{
       background: dark ? '#0f172a' : '#ffffff',
       color: dark ? '#ffffff' : '#0f172a',
+      padding: '14px 16px',
     }}
     >
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
-    <div>
-    <div style={{ fontSize: 14, color: dark ? '#cbd5e1' : '#64748b' }}>{title}</div>
-    <div style={{ marginTop: 10, fontSize: 32, fontWeight: 800 }}>{value}</div>
-    <div style={{ marginTop: 8, fontSize: 12, color: dark ? '#94a3b8' : '#94a3b8' }}>{helper}</div>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+    <div style={{ minWidth: 0 }}>
+    <div style={{ fontSize: 12, color: dark ? '#cbd5e1' : '#64748b', fontWeight: 600 }}>{title}</div>
+    <div style={{ marginTop: 6, fontSize: 22, fontWeight: 800, lineHeight: 1.2 }}>{value}</div>
+    <div style={{ marginTop: 4, fontSize: 11, color: dark ? '#94a3b8' : '#94a3b8' }}>{helper}</div>
     </div>
     <div
     style={{
-      width: 48,
-      height: 48,
-      borderRadius: 16,
+      width: 38,
+      height: 38,
+      borderRadius: 12,
       background: dark ? 'rgba(255,255,255,0.08)' : '#f1f5f9',
       display: 'grid',
       placeItems: 'center',
       flexShrink: 0,
     }}
     >
-    <Icon size={20} />
+    <Icon size={17} />
     </div>
     </div>
     </Card>
@@ -360,19 +361,20 @@ function SectionTitle({ title, subtitle, right, isMobile = false }) {
   );
 }
 
-function FilterChip({ active, onClick, children }) {
+function FilterChip({ active, onClick, children, small = false }) {
   return (
     <button
     onClick={onClick}
     style={{
-      padding: '10px 14px',
+      padding: small ? '7px 12px' : '10px 14px',
       borderRadius: 999,
       border: active ? 'none' : '1px solid #dbe2ea',
       background: active ? '#0f172a' : '#ffffff',
       color: active ? '#ffffff' : '#334155',
       cursor: 'pointer',
       fontWeight: 700,
-      fontSize: 13,
+      fontSize: small ? 12 : 13,
+      whiteSpace: 'nowrap',
     }}
     >
     {children}
@@ -541,212 +543,266 @@ function PaymentInfoBox({ order }) {
     return (
       <motion.div layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
       <Card style={{ padding: 0, overflow: 'hidden' }}>
-      {/* Header */}
-      <div style={{ padding: isMobile ? 16 : 20, borderBottom: '1px solid #eef2f7' }}>
-      <div
-      style={{
+      
+      {/* ===== HEADER ===== */}
+      <div style={{ padding: isMobile ? 14 : 20, borderBottom: '1px solid #eef2f7' }}>
+      <div style={{
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        gap: 12,
+        alignItems: 'center',
+        gap: 10,
         flexWrap: 'wrap',
-        flexDirection: isMobile ? 'column' : 'row',
-      }}
-      >
-      <div style={{ width: isMobile ? '100%' : 'auto' }}>
-      <div style={{ fontSize: isMobile ? 20 : 24, fontWeight: 800, color: '#0f172a' }}>
+      }}>
+      {/* Chap: ID + badge-lar */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ fontSize: isMobile ? 17 : 22, fontWeight: 800, color: '#0f172a' }}>
       Buyurtma #{order.id}
       </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
       <Badge status={order.status} />
       <MethodBadge paymentMethod={order.paymentMethod} />
       <PaymentBadge paymentStatus={order.paymentStatus} />
       </div>
       </div>
       
-      <div
-      style={{
-        width: isMobile ? '100%' : 'auto',
-        minWidth: isMobile ? '100%' : 220,
-        padding: 18,
-        borderRadius: 20,
+      {/* O'ng: Summa */}
+      <div style={{
+        padding: isMobile ? '10px 14px' : 18,
+        borderRadius: 16,
         background: '#0f172a',
         color: '#ffffff',
-      }}
-      >
-      <div style={{ fontSize: 12, color: '#cbd5e1' }}>Jami summa</div>
-      <div style={{ marginTop: 6, fontSize: isMobile ? 26 : 30, fontWeight: 800 }}>
+        flexShrink: 0,
+      }}>
+      <div style={{ fontSize: 11, color: '#cbd5e1' }}>Jami summa</div>
+      <div style={{ marginTop: 4, fontSize: isMobile ? 20 : 28, fontWeight: 800, whiteSpace: 'nowrap' }}>
       {formatPrice(order.total || 0)}
       </div>
       </div>
       </div>
       </div>
       
-      {/* Body */}
-      <div
-      style={{
-        padding: isMobile ? 16 : 20,
-        display: 'grid',
-        gridTemplateColumns: contentColumns,
-        gap: 20,
-      }}
-      >
-      {/* 1-ustun: Mijoz ma'lumotlari */}
-      <div style={{ display: 'grid', gap: 12 }}>
-      <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>Mijoz ma'lumotlari</div>
-      <InfoLine icon={Eye} text={order.name || "Noma'lum"} />
-      <InfoLine icon={Phone} text={order.phone || "Telefon yo'q"} />
-      <InfoLine icon={AtSign} text={username} />
-      <InfoLine icon={Clock3} text={formatDateTime(order.createdAt)} />
-      <InfoLine icon={Truck} text={getDeliveryTypeText(order)} />
-      </div>
-      
-      {/* 2-ustun: Mahsulotlar + Manzil */}
-      <div style={{ display: 'grid', gap: 14 }}>
-      <div
-      style={{
-        padding: 16,
-        borderRadius: 18,
-        background: '#f8fafc',
-        border: '1px solid #eef2f7',
-      }}
-      >
-      <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
-      Mahsulotlar
-      </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-      {(items.length ? items : ['Mahsulot topilmadi']).map((item, idx) => (
-        <span
-        key={idx}
-        style={{
-          padding: '8px 12px',
-          borderRadius: 999,
-          background: '#ffffff',
-          border: '1px solid #e2e8f0',
-          fontSize: 13,
-          color: '#334155',
-        }}
-        >
-        {item}
-        </span>
-      ))}
-      </div>
-      </div>
-      
-      <div
-      style={{
-        padding: 16,
-        borderRadius: 18,
-        background: '#f8fafc',
-        border: '1px solid #eef2f7',
-      }}
-      >
-      <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
-      Manzil
-      </div>
-      {location.text ? (
-        <InfoLine icon={MapPin} text={location.text} />
-      ) : (
-        <InfoLine icon={MapPin} text="Manzil yo'q" />
-      )}
-      {location.hasCoords ? (
-        <div style={{ marginTop: 8 }}>
-        <InfoLine icon={MapPin} text="Xaritada ochish" link={location.link} />
-        </div>
-      ) : null}
-      </div>
-      </div>
-      
-      {/* 3-ustun: To'lov ma'lumotlari + Buyurtma boshqaruvi */}
-      <div style={{ display: 'grid', gap: 14 }}>
-      {/* To'lov ma'lumotlari - faqat ko'rsatish */}
-      <PaymentInfoBox order={order} />
-      
-      {/* Buyurtma boshqaruvi */}
-      {!hideActions ? (
-        <div
-        style={{
-          padding: 16,
-          borderRadius: 18,
+      {/* ===== BODY ===== */}
+      {isMobile ? (
+        /* ---- MOBIL LAYOUT ---- */
+        <div style={{ padding: 14, display: 'grid', gap: 12 }}>
+        
+        {/* Mijoz ma'lumotlari - compact */}
+        <div style={{
+          padding: 14,
+          borderRadius: 16,
           background: '#f8fafc',
           border: '1px solid #eef2f7',
-        }}
-        >
-        <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
-        Buyurtma boshqaruvi
+        }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
+        Mijoz ma'lumotlari
         </div>
-        <div style={{ display: 'grid', gap: 10 }}>
-        <Button
-        onClick={() => onStatusChange(order.id, 'Qabul qilindi')}
-        disabled={!canAccept}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
-          width: '100%',
-        }}
-        >
-        <CheckCircle2 size={15} /> Qabul qilindi
-        </Button>
-        <Button
-        onClick={() => onStatusChange(order.id, 'Tayyor')}
-        disabled={!canReady}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
-          width: '100%',
-        }}
-        >
-        <ChefHat size={15} /> Tayyor
-        </Button>
-        <Button
-        onClick={() => onStatusChange(order.id, 'Yetkazildi')}
-        disabled={!canDeliver}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
-          width: '100%',
-        }}
-        >
-        <PackageCheck size={15} /> Yetkazildi
-        </Button>
+        <div style={{ display: 'grid', gap: 8 }}>
+        <InfoLine icon={Eye} text={order.name || "Noma'lum"} />
+        <InfoLine icon={Phone} text={order.phone || "Telefon yo'q"} />
+        <InfoLine icon={AtSign} text={username} />
+        <InfoLine icon={Clock3} text={formatDateTime(order.createdAt)} />
+        <InfoLine icon={Truck} text={getDeliveryTypeText(order)} />
         </div>
         </div>
-      ) : (
-        <div
-        style={{
-          padding: 16,
-          borderRadius: 18,
+        
+        {/* Mahsulotlar */}
+        <div style={{
+          padding: 14,
+          borderRadius: 16,
           background: '#f8fafc',
           border: '1px solid #eef2f7',
-        }}
-        >
-        <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
-        History boshqaruvi
+        }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
+        Mahsulotlar
         </div>
-        <Button
-        onClick={() => onDeleteOrder(order.id)}
-        style={{
-          width: '100%',
-          background: '#fee2e2',
-          color: '#991b1b',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
-        }}
-        >
-        <Trash2 size={15} /> O'chirish
-        </Button>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {(items.length ? items : ['Mahsulot topilmadi']).map((item, idx) => (
+          <span key={idx} style={{
+            padding: '6px 10px',
+            borderRadius: 999,
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            fontSize: 12,
+            color: '#334155',
+          }}>
+          {item}
+          </span>
+        ))}
+        </div>
+        </div>
+        
+        {/* Manzil */}
+        <div style={{
+          padding: 14,
+          borderRadius: 16,
+          background: '#f8fafc',
+          border: '1px solid #eef2f7',
+        }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
+        Manzil
+        </div>
+        {location.text
+          ? <InfoLine icon={MapPin} text={location.text} />
+          : <InfoLine icon={MapPin} text="Manzil yo'q" />
+        }
+        {location.hasCoords && (
+          <div style={{ marginTop: 8 }}>
+          <InfoLine icon={MapPin} text="Xaritada ochish" link={location.link} />
+          </div>
+        )}
+        </div>
+        
+        {/* To'lov ma'lumotlari */}
+        <PaymentInfoBox order={order} />
+        
+        {/* Buyurtma boshqaruvi tugmalari */}
+        {!hideActions ? (
+          <div style={{
+            padding: 14,
+            borderRadius: 16,
+            background: '#f8fafc',
+            border: '1px solid #eef2f7',
+          }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
+          Buyurtma boshqaruvi
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+          <Button
+          onClick={() => onStatusChange(order.id, 'Qabul qilindi')}
+          disabled={!canAccept}
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '10px 6px', fontSize: 11, width: '100%' }}
+          >
+          <CheckCircle2 size={16} />
+          <span>Qabul</span>
+          </Button>
+          <Button
+          onClick={() => onStatusChange(order.id, 'Tayyor')}
+          disabled={!canReady}
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '10px 6px', fontSize: 11, width: '100%' }}
+          >
+          <ChefHat size={16} />
+          <span>Tayyor</span>
+          </Button>
+          <Button
+          onClick={() => onStatusChange(order.id, 'Yetkazildi')}
+          disabled={!canDeliver}
+          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '10px 6px', fontSize: 11, width: '100%' }}
+          >
+          <PackageCheck size={16} />
+          <span>Yetkazildi</span>
+          </Button>
+          </div>
+          </div>
+        ) : (
+          <Button
+          onClick={() => onDeleteOrder(order.id)}
+          style={{ width: '100%', background: '#fee2e2', color: '#991b1b', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+          >
+          <Trash2 size={15} /> O'chirish
+          </Button>
+        )}
+        </div>
+      ) : (
+        /* ---- DESKTOP / TABLET LAYOUT ---- */
+        <div style={{
+          padding: 20,
+          display: 'grid',
+          gridTemplateColumns: contentColumns,
+          gap: 20,
+        }}>
+        {/* 1-ustun: Mijoz ma'lumotlari */}
+        <div style={{ display: 'grid', gap: 12 }}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>Mijoz ma'lumotlari</div>
+        <InfoLine icon={Eye} text={order.name || "Noma'lum"} />
+        <InfoLine icon={Phone} text={order.phone || "Telefon yo'q"} />
+        <InfoLine icon={AtSign} text={username} />
+        <InfoLine icon={Clock3} text={formatDateTime(order.createdAt)} />
+        <InfoLine icon={Truck} text={getDeliveryTypeText(order)} />
+        </div>
+        
+        {/* 2-ustun: Mahsulotlar + Manzil */}
+        <div style={{ display: 'grid', gap: 14 }}>
+        <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc', border: '1px solid #eef2f7' }}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>Mahsulotlar</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {(items.length ? items : ['Mahsulot topilmadi']).map((item, idx) => (
+          <span key={idx} style={{
+            padding: '8px 12px',
+            borderRadius: 999,
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            fontSize: 13,
+            color: '#334155',
+          }}>
+          {item}
+          </span>
+        ))}
+        </div>
+        </div>
+        
+        <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc', border: '1px solid #eef2f7' }}>
+        <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>Manzil</div>
+        {location.text
+          ? <InfoLine icon={MapPin} text={location.text} />
+          : <InfoLine icon={MapPin} text="Manzil yo'q" />
+        }
+        {location.hasCoords && (
+          <div style={{ marginTop: 8 }}>
+          <InfoLine icon={MapPin} text="Xaritada ochish" link={location.link} />
+          </div>
+        )}
+        </div>
+        </div>
+        
+        {/* 3-ustun: To'lov + Buyurtma boshqaruvi */}
+        <div style={{ display: 'grid', gap: 14 }}>
+        <PaymentInfoBox order={order} />
+        
+        {!hideActions ? (
+          <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc', border: '1px solid #eef2f7' }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
+          Buyurtma boshqaruvi
+          </div>
+          <div style={{ display: 'grid', gap: 10 }}>
+          <Button
+          onClick={() => onStatusChange(order.id, 'Qabul qilindi')}
+          disabled={!canAccept}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%' }}
+          >
+          <CheckCircle2 size={15} /> Qabul qilindi
+          </Button>
+          <Button
+          onClick={() => onStatusChange(order.id, 'Tayyor')}
+          disabled={!canReady}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%' }}
+          >
+          <ChefHat size={15} /> Tayyor
+          </Button>
+          <Button
+          onClick={() => onStatusChange(order.id, 'Yetkazildi')}
+          disabled={!canDeliver}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%' }}
+          >
+          <PackageCheck size={15} /> Yetkazildi
+          </Button>
+          </div>
+          </div>
+        ) : (
+          <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc', border: '1px solid #eef2f7' }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
+          History boshqaruvi
+          </div>
+          <Button
+          onClick={() => onDeleteOrder(order.id)}
+          style={{ width: '100%', background: '#fee2e2', color: '#991b1b', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+          >
+          <Trash2 size={15} /> O'chirish
+          </Button>
+          </div>
+        )}
+        </div>
         </div>
       )}
-      </div>
-      </div>
       </Card>
       </motion.div>
     );
@@ -1028,8 +1084,8 @@ function PaymentInfoBox({ order }) {
     
     const dailyStats = useMemo(() => buildDailyStats(orders), [orders]);
     
-    const topStatsGrid = isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)';
-    const dashboardQuickGrid = isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)';
+    const topStatsGrid = isMobile ? 'repeat(2, 1fr)' : isTablet ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)';
+    const dashboardQuickGrid = isMobile ? 'repeat(2, 1fr)' : isTablet ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)';
     const productGrid = isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)';
     const statsGrid4 = isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)';
     const statsGrid3 = isMobile ? '1fr' : isTablet ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)';
@@ -1155,30 +1211,46 @@ function PaymentInfoBox({ order }) {
       style={{
         minHeight: '100vh',
         background: '#f3f6fb',
-        padding: isMobile ? 14 : 22,
+        padding: isMobile ? 10 : 22,
         fontFamily: 'Arial, sans-serif',
       }}
       >
       {isMobile && (
-        <div style={{ position: 'sticky', top: 0, zIndex: 50, marginBottom: 14 }}>
-        <Card style={{ padding: 14, borderRadius: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+        <div style={{ position: 'sticky', top: 0, zIndex: 50, marginBottom: 12 }}>
+        <div style={{
+          background: '#ffffff',
+          borderBottom: '1px solid #e5e7eb',
+          padding: '12px 14px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 10,
+          boxShadow: '0 2px 12px rgba(15,23,42,0.06)',
+        }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 12,
+          background: '#0f172a', display: 'grid', placeItems: 'center',
+        }}>
+        <UtensilsCrossed size={18} color="#ffffff" />
+        </div>
         <div>
-        <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a' }}>Admin Panel</div>
-        <div style={{ fontSize: 12, color: '#16a34a', marginTop: 4 }}>{streamStatus}</div>
+        <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>Ajabo Burger</div>
+        <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>{streamStatus}</div>
+        </div>
         </div>
         <button
         onClick={() => setSidebarOpen((prev) => !prev)}
         style={{
-          width: 44, height: 44, borderRadius: 14, border: 'none',
+          width: 40, height: 40, borderRadius: 12, border: 'none',
           background: '#0f172a', color: '#ffffff',
           display: 'grid', placeItems: 'center', cursor: 'pointer',
+          flexShrink: 0,
         }}
         >
-        {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+        {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
         </button>
         </div>
-        </Card>
         </div>
       )}
       
@@ -1188,7 +1260,7 @@ function PaymentInfoBox({ order }) {
         margin: '0 auto',
         display: 'grid',
         gridTemplateColumns: mainGridColumns,
-        gap: 22,
+        gap: isMobile ? 10 : 22,
       }}
       >
       {(!isMobile || sidebarOpen) && (
@@ -1230,7 +1302,7 @@ function PaymentInfoBox({ order }) {
         </div>
         <div>
         <div style={{ fontSize: 13, color: '#cbd5e1' }}>Restaurant Admin</div>
-        <div style={{ fontSize: 24, fontWeight: 800 }}>Shovot Lavka</div>
+        <div style={{ fontSize: 24, fontWeight: 800 }}>Ajabo Burger</div>
         </div>
         </div>
         <div style={{ display: 'grid', gap: 8 }}>
@@ -1245,10 +1317,10 @@ function PaymentInfoBox({ order }) {
         </>
       )}
       
-      <div style={{ display: 'grid', gap: 22 }}>
+      <div style={{ display: 'grid', gap: isMobile ? 12 : 22 }}>
       {!isMobile && (
         <Card>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', flexWrap: 'wrap', overflow: 'hidden' }}>
         <div>
         <div style={{ fontSize: 38, fontWeight: 800, color: '#0f172a' }}>Admin Panel</div>
         <div style={{ color: '#64748b', marginTop: 6 }}>
@@ -1258,7 +1330,7 @@ function PaymentInfoBox({ order }) {
         {streamStatus}
         </div>
         </div>
-        <div style={{ position: 'relative', width: 340, maxWidth: '100%' }}>
+        <div style={{ position: 'relative', width: 280, flexShrink: 0 }}>
         <Search size={16} style={{ position: 'absolute', left: 12, top: 14, color: '#94a3b8' }} />
         <Input
         value={search}
@@ -1340,21 +1412,21 @@ function PaymentInfoBox({ order }) {
         <Card>
         <SectionTitle title="Buyurtmalar" subtitle={`Har sahifada ${ORDERS_PER_PAGE} ta buyurtma`} isMobile={isMobile} />
         <div style={{ marginTop: 18, display: 'grid', gap: 14 }}>
-        <div style={{ display: 'grid', gap: 12, padding: 14, borderRadius: 18, background: '#f8fafc', border: '1px solid #eef2f7' }}>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <Filter size={16} />
-        <FilterChip active={orderTab === 'active'} onClick={() => setOrderTab('active')}>Active</FilterChip>
-        <FilterChip active={orderTab === 'history'} onClick={() => setOrderTab('history')}>History</FilterChip>
+        <div style={{ display: 'grid', gap: 10, padding: 12, borderRadius: 18, background: '#f8fafc', border: '1px solid #eef2f7' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', overflowX: 'auto', paddingBottom: 2 }}>
+        <Filter size={14} style={{ flexShrink: 0 }} />
+        <FilterChip small active={orderTab === 'active'} onClick={() => setOrderTab('active')}>Active</FilterChip>
+        <FilterChip small active={orderTab === 'history'} onClick={() => setOrderTab('history')}>History</FilterChip>
         </div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        <FilterChip active={paymentFilter === 'all'} onClick={() => setPaymentFilter('all')}>Barcha to'lovlar</FilterChip>
-        <FilterChip active={paymentFilter === 'cash'} onClick={() => setPaymentFilter('cash')}>Naqd</FilterChip>
-        <FilterChip active={paymentFilter === 'click'} onClick={() => setPaymentFilter('click')}>Click</FilterChip>
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+        <FilterChip small active={paymentFilter === 'all'} onClick={() => setPaymentFilter('all')}>Barchasi</FilterChip>
+        <FilterChip small active={paymentFilter === 'cash'} onClick={() => setPaymentFilter('cash')}>Naqd</FilterChip>
+        <FilterChip small active={paymentFilter === 'click'} onClick={() => setPaymentFilter('click')}>Click</FilterChip>
         </div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        <FilterChip active={paymentStatusFilter === 'all'} onClick={() => setPaymentStatusFilter('all')}>Hammasi</FilterChip>
-        <FilterChip active={paymentStatusFilter === 'paid'} onClick={() => setPaymentStatusFilter('paid')}>To'langan</FilterChip>
-        <FilterChip active={paymentStatusFilter === 'pending'} onClick={() => setPaymentStatusFilter('pending')}>Kutilmoqda</FilterChip>
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+        <FilterChip small active={paymentStatusFilter === 'all'} onClick={() => setPaymentStatusFilter('all')}>Hammasi</FilterChip>
+        <FilterChip small active={paymentStatusFilter === 'paid'} onClick={() => setPaymentStatusFilter('paid')}>To'langan</FilterChip>
+        <FilterChip small active={paymentStatusFilter === 'pending'} onClick={() => setPaymentStatusFilter('pending')}>Kutilmoqda</FilterChip>
         </div>
         </div>
         
