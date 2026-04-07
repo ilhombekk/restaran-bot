@@ -31,6 +31,12 @@ import {
   Trash2,
   CreditCard,
   Banknote,
+  Filter,
+  Check,
+  Menu,
+  X,
+  Wallet,
+  PackageCheck,
 } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -101,188 +107,9 @@ function getPaymentStatusText(paymentStatus) {
   return 'Kutilmoqda';
 }
 
-function Card({ children, style = {} }) {
-  return (
-    <div
-    style={{
-      background: '#fff',
-      borderRadius: 24,
-      padding: 20,
-      boxShadow: '0 4px 20px rgba(15,23,42,0.06)',
-      ...style,
-    }}
-    >
-    {children}
-    </div>
-  );
-}
-
-function Button({ children, onClick, style = {}, disabled = false, type = 'button' }) {
-  return (
-    <button
-    type={type}
-    onClick={onClick}
-    disabled={disabled}
-    style={{
-      border: 'none',
-      borderRadius: 16,
-      padding: '12px 16px',
-      background: disabled ? '#e2e8f0' : '#0f172a',
-      color: disabled ? '#64748b' : '#fff',
-      cursor: disabled ? 'not-allowed' : 'pointer',
-      fontWeight: 600,
-      ...style,
-    }}
-    >
-    {children}
-    </button>
-  );
-}
-
-function Input({ value, onChange, placeholder, type = 'text', style = {} }) {
-  return (
-    <input
-    type={type}
-    value={value}
-    onChange={onChange}
-    placeholder={placeholder}
-    style={{
-      width: '100%',
-      padding: '12px 14px',
-      borderRadius: 16,
-      border: '1px solid #e2e8f0',
-      outline: 'none',
-      fontSize: 14,
-      ...style,
-    }}
-    />
-  );
-}
-
-function SidebarItem({ active, icon: Icon, label, onClick }) {
-  return (
-    <button
-    onClick={onClick}
-    style={{
-      width: '100%',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 12,
-      padding: '14px 16px',
-      borderRadius: 18,
-      border: 'none',
-      cursor: 'pointer',
-      background: active ? '#0f172a' : 'transparent',
-      color: active ? '#fff' : '#475569',
-      textAlign: 'left',
-    }}
-    >
-    <Icon size={18} />
-    <span style={{ fontWeight: 600 }}>{label}</span>
-    </button>
-  );
-}
-
-function StatCard({ title, value, icon: Icon, helper }) {
-  return (
-    <Card>
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
-    <div>
-    <div style={{ fontSize: 14, color: '#64748b' }}>{title}</div>
-    <div style={{ marginTop: 8, fontSize: 28, fontWeight: 800, color: '#0f172a' }}>{value}</div>
-    <div style={{ marginTop: 6, fontSize: 12, color: '#94a3b8' }}>{helper}</div>
-    </div>
-    <div
-    style={{
-      width: 44,
-      height: 44,
-      borderRadius: 16,
-      background: '#f1f5f9',
-      display: 'grid',
-      placeItems: 'center',
-    }}
-    >
-    <Icon size={20} />
-    </div>
-    </div>
-    </Card>
-  );
-}
-
-function Badge({ status }) {
-  const conf = statusMap[status] || { label: status, bg: '#e2e8f0', color: '#334155' };
-  return (
-    <span
-    style={{
-      display: 'inline-block',
-      padding: '6px 10px',
-      borderRadius: 999,
-      background: conf.bg,
-      color: conf.color,
-      fontSize: 12,
-      fontWeight: 700,
-    }}
-    >
-    {conf.label}
-    </span>
-  );
-}
-
-function PaymentBadge({ paymentStatus }) {
-  const isPaid = paymentStatus === 'paid';
-  const isFailed = paymentStatus === 'failed';
-  
-  let bg = '#fef3c7';
-  let color = '#b45309';
-  let label = 'Kutilmoqda';
-  
-  if (isPaid) {
-    bg = '#d1fae5';
-    color = '#047857';
-    label = 'To‘langan';
-  }
-  
-  if (isFailed) {
-    bg = '#fee2e2';
-    color = '#b91c1c';
-    label = 'Muvaffaqiyatsiz';
-  }
-  
-  return (
-    <span
-    style={{
-      display: 'inline-block',
-      padding: '6px 10px',
-      borderRadius: 999,
-      background: bg,
-      color,
-      fontSize: 12,
-      fontWeight: 700,
-    }}
-    >
-    {label}
-    </span>
-  );
-}
-
-function MethodBadge({ paymentMethod }) {
-  const isClick = paymentMethod === 'click';
-  
-  return (
-    <span
-    style={{
-      display: 'inline-block',
-      padding: '6px 10px',
-      borderRadius: 999,
-      background: isClick ? '#dbeafe' : '#f3f4f6',
-      color: isClick ? '#1d4ed8' : '#334155',
-      fontSize: 12,
-      fontWeight: 700,
-    }}
-    >
-    {isClick ? 'Click' : 'Naqd'}
-    </span>
-  );
+function getDeliveryTypeText(order) {
+  if (order?.deliveryType === 'pickup') return "O‘zi olib ketadi";
+  return "Yetkazib berish";
 }
 
 function getLocationData(order) {
@@ -321,101 +148,404 @@ function getLocationData(order) {
   };
 }
 
+function useResponsive() {
+  const [screenWidth, setScreenWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : 1400
+  );
+  
+  useEffect(() => {
+    const onResize = () => setScreenWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  
+  const isMobile = screenWidth <= 768;
+  const isTablet = screenWidth > 768 && screenWidth <= 1100;
+  const isSmallMobile = screenWidth <= 480;
+  
+  return { screenWidth, isMobile, isTablet, isSmallMobile };
+}
+
+function Card({ children, style = {} }) {
+  return (
+    <div
+    style={{
+      background: '#ffffff',
+      borderRadius: 24,
+      padding: 20,
+      border: '1px solid #e5e7eb',
+      boxShadow: '0 10px 30px rgba(15, 23, 42, 0.05)',
+      ...style,
+    }}
+    >
+    {children}
+    </div>
+  );
+}
+
+function Button({ children, onClick, style = {}, disabled = false, type = 'button' }) {
+  return (
+    <button
+    type={type}
+    onClick={onClick}
+    disabled={disabled}
+    style={{
+      border: 'none',
+      borderRadius: 14,
+      padding: '11px 14px',
+      background: disabled ? '#e2e8f0' : '#0f172a',
+      color: disabled ? '#64748b' : '#ffffff',
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      fontWeight: 700,
+      fontSize: 13,
+      transition: '0.2s ease',
+      ...style,
+    }}
+    >
+    {children}
+    </button>
+  );
+}
+
+function Input({ value, onChange, placeholder, type = 'text', style = {} }) {
+  return (
+    <input
+    type={type}
+    value={value}
+    onChange={onChange}
+    placeholder={placeholder}
+    style={{
+      width: '100%',
+      padding: '12px 14px',
+      borderRadius: 14,
+      border: '1px solid #dbe2ea',
+      outline: 'none',
+      fontSize: 14,
+      background: '#ffffff',
+      ...style,
+    }}
+    />
+  );
+}
+
+function SidebarItem({ active, icon: Icon, label, onClick }) {
+  return (
+    <button
+    onClick={onClick}
+    style={{
+      width: '100%',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+      padding: '14px 16px',
+      borderRadius: 18,
+      border: 'none',
+      cursor: 'pointer',
+      background: active ? '#0f172a' : 'transparent',
+      color: active ? '#ffffff' : '#475569',
+      textAlign: 'left',
+      fontWeight: 700,
+    }}
+    >
+    <Icon size={18} />
+    <span>{label}</span>
+    </button>
+  );
+}
+
+function StatCard({ title, value, helper, icon: Icon, dark = false }) {
+  return (
+    <Card
+    style={{
+      background: dark ? '#0f172a' : '#ffffff',
+      color: dark ? '#ffffff' : '#0f172a',
+    }}
+    >
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+    <div>
+    <div style={{ fontSize: 14, color: dark ? '#cbd5e1' : '#64748b' }}>{title}</div>
+    <div style={{ marginTop: 10, fontSize: 32, fontWeight: 800 }}>{value}</div>
+    <div style={{ marginTop: 8, fontSize: 12, color: dark ? '#94a3b8' : '#94a3b8' }}>{helper}</div>
+    </div>
+    
+    <div
+    style={{
+      width: 48,
+      height: 48,
+      borderRadius: 16,
+      background: dark ? 'rgba(255,255,255,0.08)' : '#f1f5f9',
+      display: 'grid',
+      placeItems: 'center',
+      flexShrink: 0,
+    }}
+    >
+    <Icon size={20} />
+    </div>
+    </div>
+    </Card>
+  );
+}
+
+function Badge({ status }) {
+  const conf = statusMap[status] || { label: status, bg: '#e2e8f0', color: '#334155' };
+  
+  return (
+    <span
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 6,
+      padding: '6px 10px',
+      borderRadius: 999,
+      background: conf.bg,
+      color: conf.color,
+      fontSize: 12,
+      fontWeight: 800,
+    }}
+    >
+    {conf.label}
+    </span>
+  );
+}
+
+function PaymentBadge({ paymentStatus }) {
+  let bg = '#fef3c7';
+  let color = '#b45309';
+  let label = 'Kutilmoqda';
+  
+  if (paymentStatus === 'paid') {
+    bg = '#d1fae5';
+    color = '#047857';
+    label = 'To‘langan';
+  }
+  
+  if (paymentStatus === 'failed') {
+    bg = '#fee2e2';
+    color = '#b91c1c';
+    label = 'Muvaffaqiyatsiz';
+  }
+  
+  return (
+    <span
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 6,
+      padding: '6px 10px',
+      borderRadius: 999,
+      background: bg,
+      color,
+      fontSize: 12,
+      fontWeight: 800,
+    }}
+    >
+    {label}
+    </span>
+  );
+}
+
+function MethodBadge({ paymentMethod }) {
+  const isClick = paymentMethod === 'click';
+  
+  return (
+    <span
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 6,
+      padding: '6px 10px',
+      borderRadius: 999,
+      background: isClick ? '#dbeafe' : '#f3f4f6',
+      color: isClick ? '#1d4ed8' : '#334155',
+      fontSize: 12,
+      fontWeight: 800,
+    }}
+    >
+    {isClick ? 'Click' : 'Naqd'}
+    </span>
+  );
+}
+
+function SectionTitle({ title, subtitle, right, isMobile = false }) {
+  return (
+    <div
+    style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: isMobile ? 'flex-start' : 'center',
+      gap: 16,
+      flexWrap: 'wrap',
+      flexDirection: isMobile ? 'column' : 'row',
+    }}
+    >
+    <div>
+    <div style={{ fontSize: isMobile ? 20 : 24, fontWeight: 800, color: '#0f172a' }}>{title}</div>
+    {subtitle ? (
+      <div style={{ marginTop: 4, color: '#64748b', fontSize: 14 }}>{subtitle}</div>
+    ) : null}
+    </div>
+    {right}
+    </div>
+  );
+}
+
+function FilterChip({ active, onClick, children }) {
+  return (
+    <button
+    onClick={onClick}
+    style={{
+      padding: '10px 14px',
+      borderRadius: 999,
+      border: active ? 'none' : '1px solid #dbe2ea',
+      background: active ? '#0f172a' : '#ffffff',
+      color: active ? '#ffffff' : '#334155',
+      cursor: 'pointer',
+      fontWeight: 700,
+      fontSize: 13,
+    }}
+    >
+    {children}
+    </button>
+  );
+}
+
+function InfoLine({ icon: Icon, text, link }) {
+  return (
+    <div style={{ display: 'flex', gap: 9, alignItems: 'flex-start', color: '#475569', fontSize: 14 }}>
+    <Icon size={16} style={{ marginTop: 2, flexShrink: 0 }} />
+    {link ? (
+      <a href={link} target="_blank" rel="noreferrer" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 600 }}>
+      {text}
+      </a>
+    ) : (
+      <span>{text}</span>
+    )}
+    </div>
+  );
+}
+
 function OrderCard({
   order,
   onStatusChange,
   onDeleteOrder,
   onPaymentUpdate,
-  hideActions = false
+  hideActions = false,
+  isMobile = false,
+  isTablet = false,
 }) {
   const items = typeof order.cartText === 'string'
   ? order.cartText
   .split('\n')
-  .filter((line) => line.trim() && line.trim() !== '🛒 Savat:')
+  .map((line) => line.trim())
+  .filter((line) => line && line !== '🛒 Savat:')
   : [];
   
   const location = getLocationData(order);
   const username = order?.username ? `@${String(order.username).replace(/^@/, '')}` : 'Username yo‘q';
   
+  const canAccept = order.status === 'Yangi buyurtma';
+  const canReady = order.status === 'Qabul qilindi';
+  const canDeliver = order.status === 'Tayyor';
+  
+  const contentColumns = isMobile
+  ? '1fr'
+  : isTablet
+  ? '1fr'
+  : '1.15fr 1fr 320px';
+  
   return (
     <motion.div layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-    <Card>
-    <div style={{ display: 'grid', gap: 20, gridTemplateColumns: '1.3fr 300px' }}>
-    <div>
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
-    <div style={{ fontSize: 20, fontWeight: 700 }}>Buyurtma #{order.id}</div>
+    <Card style={{ padding: 0, overflow: 'hidden' }}>
+    <div style={{ padding: isMobile ? 16 : 20, borderBottom: '1px solid #eef2f7' }}>
+    <div
+    style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      gap: 12,
+      flexWrap: 'wrap',
+      flexDirection: isMobile ? 'column' : 'row',
+    }}
+    >
+    <div style={{ width: isMobile ? '100%' : 'auto' }}>
+    <div style={{ fontSize: isMobile ? 20 : 24, fontWeight: 800, color: '#0f172a' }}>
+    Buyurtma #{order.id}
+    </div>
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
     <Badge status={order.status} />
     <MethodBadge paymentMethod={order.paymentMethod} />
     <PaymentBadge paymentStatus={order.paymentStatus} />
     </div>
-    
-    <div style={{ marginTop: 16, display: 'grid', gap: 10, color: '#475569', fontSize: 14 }}>
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-    <Eye size={16} /> {order.name || "Noma’lum"}
     </div>
     
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-    <Phone size={16} /> {order.phone || "Telefon yo‘q"}
+    <div
+    style={{
+      width: isMobile ? '100%' : 'auto',
+      minWidth: isMobile ? '100%' : 220,
+      padding: 18,
+      borderRadius: 20,
+      background: '#0f172a',
+      color: '#ffffff',
+    }}
+    >
+    <div style={{ fontSize: 12, color: '#cbd5e1' }}>Jami summa</div>
+    <div style={{ marginTop: 6, fontSize: isMobile ? 26 : 30, fontWeight: 800 }}>
+    {formatPrice(order.total || 0)}
     </div>
-    
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-    <AtSign size={16} /> {username}
-    </div>
-    
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-    <Clock3 size={16} /> {formatDateTime(order.createdAt)}
-    </div>
-    
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-    <CreditCard size={16} /> {getPaymentMethodText(order.paymentMethod)} / {getPaymentStatusText(order.paymentStatus)}
-    </div>
-    
-    {order.paidAt ? (
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-      <Banknote size={16} /> To‘langan vaqt: {formatDateTime(order.paidAt)}
-      </div>
-    ) : null}
-    
-    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-    <MapPin size={16} style={{ marginTop: 2, flexShrink: 0 }} />
-    <div style={{ display: 'grid', gap: 6 }}>
-    {location.text ? <span>{location.text}</span> : null}
-    
-    {location.hasCoords ? (
-      <a
-      href={location.link}
-      target="_blank"
-      rel="noreferrer"
-      style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 600 }}
-      >
-      Xaritada ochish
-      </a>
-    ) : !location.text ? (
-      <span>Manzil yo‘q</span>
-    ) : null}
     </div>
     </div>
     </div>
     
     <div
     style={{
-      marginTop: 16,
-      padding: 14,
-      borderRadius: 18,
-      background: '#f8fafc',
+      padding: isMobile ? 16 : 20,
+      display: 'grid',
+      gridTemplateColumns: contentColumns,
+      gap: 20,
     }}
     >
-    <div style={{ fontWeight: 700, marginBottom: 10 }}>Mahsulotlar</div>
-    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-    {(items.length ? items : ['Mahsulotlar mavjud']).map((item, idx) => (
+    <div style={{ display: 'grid', gap: 12 }}>
+    <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>Mijoz ma’lumotlari</div>
+    
+    <InfoLine icon={Eye} text={order.name || "Noma’lum"} />
+    <InfoLine icon={Phone} text={order.phone || "Telefon yo‘q"} />
+    <InfoLine icon={AtSign} text={username} />
+    <InfoLine icon={Clock3} text={formatDateTime(order.createdAt)} />
+    <InfoLine icon={Truck} text={getDeliveryTypeText(order)} />
+    <InfoLine
+    icon={CreditCard}
+    text={`${getPaymentMethodText(order.paymentMethod)} / ${getPaymentStatusText(order.paymentStatus)}`}
+    />
+    
+    {order.paidAt ? (
+      <InfoLine icon={Banknote} text={`To‘langan vaqt: ${formatDateTime(order.paidAt)}`} />
+    ) : null}
+    </div>
+    
+    <div style={{ display: 'grid', gap: 14 }}>
+    <div
+    style={{
+      padding: 16,
+      borderRadius: 18,
+      background: '#f8fafc',
+      border: '1px solid #eef2f7',
+    }}
+    >
+    <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
+    Mahsulotlar
+    </div>
+    
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+    {(items.length ? items : ['Mahsulot topilmadi']).map((item, idx) => (
       <span
       key={idx}
       style={{
         padding: '8px 12px',
         borderRadius: 999,
-        background: '#fff',
+        background: '#ffffff',
         border: '1px solid #e2e8f0',
         fontSize: 13,
+        color: '#334155',
       }}
       >
       {item}
@@ -423,34 +553,47 @@ function OrderCard({
     ))}
     </div>
     </div>
-    </div>
-    
-    <div style={{ display: 'grid', gap: 12 }}>
-    <div
-    style={{
-      borderRadius: 20,
-      padding: 18,
-      background: '#0f172a',
-      color: '#fff',
-    }}
-    >
-    <div style={{ fontSize: 12, color: '#cbd5e1' }}>Jami summa</div>
-    <div style={{ marginTop: 6, fontSize: 28, fontWeight: 800 }}>
-    {formatPrice(order.total || 0)}
-    </div>
-    </div>
     
     <div
     style={{
+      padding: 16,
       borderRadius: 18,
-      padding: 14,
       background: '#f8fafc',
-      display: 'grid',
-      gap: 10
+      border: '1px solid #eef2f7',
     }}
     >
-    <div style={{ fontWeight: 700, color: '#0f172a' }}>To‘lov boshqaruvi</div>
+    <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
+    Manzil
+    </div>
     
+    {location.text ? (
+      <InfoLine icon={MapPin} text={location.text} />
+    ) : (
+      <InfoLine icon={MapPin} text="Manzil yo‘q" />
+    )}
+    
+    {location.hasCoords ? (
+      <div style={{ marginTop: 8 }}>
+      <InfoLine icon={MapPin} text="Xaritada ochish" link={location.link} />
+      </div>
+    ) : null}
+    </div>
+    </div>
+    
+    <div style={{ display: 'grid', gap: 14 }}>
+    <div
+    style={{
+      padding: 16,
+      borderRadius: 18,
+      background: '#f8fafc',
+      border: '1px solid #eef2f7',
+    }}
+    >
+    <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
+    To‘lov boshqaruvi
+    </div>
+    
+    <div style={{ display: 'grid', gap: 10 }}>
     <Button
     onClick={() =>
       onPaymentUpdate(order.id, {
@@ -461,10 +604,15 @@ function OrderCard({
     }
     style={{
       background: '#ecfdf5',
-      color: '#047857'
+      color: '#047857',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      width: '100%',
     }}
     >
-    💵 Naqd to‘landi
+    <Wallet size={15} /> Naqd to‘landi
     </Button>
     
     <Button
@@ -477,10 +625,15 @@ function OrderCard({
     }
     style={{
       background: '#eff6ff',
-      color: '#1d4ed8'
+      color: '#1d4ed8',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      width: '100%',
     }}
     >
-    💳 Click to‘landi
+    <CreditCard size={15} /> Click to‘landi
     </Button>
     
     <Button
@@ -492,53 +645,104 @@ function OrderCard({
     }
     style={{
       background: '#fef3c7',
-      color: '#b45309'
+      color: '#b45309',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      width: '100%',
     }}
     >
-    ⏳ To‘lov kutilmoqda
+    <Clock3 size={15} /> To‘lov kutilmoqda
     </Button>
+    </div>
     </div>
     
     {!hideActions ? (
-      <>
+      <div
+      style={{
+        padding: 16,
+        borderRadius: 18,
+        background: '#f8fafc',
+        border: '1px solid #eef2f7',
+      }}
+      >
+      <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
+      Buyurtma boshqaruvi
+      </div>
+      
+      <div style={{ display: 'grid', gap: 10 }}>
       <Button
       onClick={() => onStatusChange(order.id, 'Qabul qilindi')}
-      disabled={order.status !== 'Yangi buyurtma'}
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-      >
-      <CheckCircle2 size={16} /> Qabul qilindi
-      </Button>
-      
-      <Button
-      onClick={() => onStatusChange(order.id, 'Tayyor')}
-      disabled={order.status !== 'Qabul qilindi'}
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-      >
-      <ChefHat size={16} /> Tayyor
-      </Button>
-      
-      <Button
-      onClick={() => onStatusChange(order.id, 'Yetkazildi')}
-      disabled={order.status !== 'Tayyor'}
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-      >
-      <Truck size={16} /> Yetkazildi
-      </Button>
-      </>
-    ) : (
-      <Button
-      onClick={() => onDeleteOrder(order.id)}
+      disabled={!canAccept}
       style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
-        background: '#fee2e2',
-        color: '#991b1b',
+        width: '100%',
       }}
       >
-      <Trash2 size={16} /> O‘chirish
+      <CheckCircle2 size={15} /> Qabul qilindi
       </Button>
+      
+      <Button
+      onClick={() => onStatusChange(order.id, 'Tayyor')}
+      disabled={!canReady}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        width: '100%',
+      }}
+      >
+      <ChefHat size={15} /> Tayyor
+      </Button>
+      
+      <Button
+      onClick={() => onStatusChange(order.id, 'Yetkazildi')}
+      disabled={!canDeliver}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        width: '100%',
+      }}
+      >
+      <PackageCheck size={15} /> Yetkazildi
+      </Button>
+      </div>
+      </div>
+    ) : (
+      <div
+      style={{
+        padding: 16,
+        borderRadius: 18,
+        background: '#f8fafc',
+        border: '1px solid #eef2f7',
+      }}
+      >
+      <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
+      History boshqaruvi
+      </div>
+      
+      <Button
+      onClick={() => onDeleteOrder(order.id)}
+      style={{
+        width: '100%',
+        background: '#fee2e2',
+        color: '#991b1b',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+      }}
+      >
+      <Trash2 size={15} /> O‘chirish
+      </Button>
+      </div>
     )}
     </div>
     </div>
@@ -634,12 +838,12 @@ function buildDailyStats(orders) {
   return Array.from(map.values()).sort((a, b) => b.dateKey.localeCompare(a.dateKey));
 }
 
-function Pagination({ currentPage, totalPages, onPageChange }) {
+function Pagination({ currentPage, totalPages, onPageChange, isMobile = false }) {
   if (totalPages <= 1) return null;
   
   const pages = [];
-  const start = Math.max(1, currentPage - 2);
-  const end = Math.min(totalPages, currentPage + 2);
+  const start = Math.max(1, currentPage - (isMobile ? 1 : 2));
+  const end = Math.min(totalPages, currentPage + (isMobile ? 1 : 2));
   
   for (let i = start; i <= end; i += 1) {
     pages.push(i);
@@ -652,7 +856,7 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
       gap: 10,
       justifyContent: 'center',
       alignItems: 'center',
-      marginTop: 20,
+      marginTop: 24,
       flexWrap: 'wrap',
     }}
     >
@@ -662,7 +866,7 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
     style={{ display: 'flex', alignItems: 'center', gap: 6 }}
     >
     <ChevronLeft size={16} />
-    Oldingi
+    {!isMobile ? 'Oldingi' : ''}
     </Button>
     
     {pages.map((page) => (
@@ -674,10 +878,10 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
         height: 44,
         borderRadius: 14,
         border: page === currentPage ? 'none' : '1px solid #cbd5e1',
-        background: page === currentPage ? '#0f172a' : '#fff',
-        color: page === currentPage ? '#fff' : '#0f172a',
+        background: page === currentPage ? '#0f172a' : '#ffffff',
+        color: page === currentPage ? '#ffffff' : '#0f172a',
         cursor: 'pointer',
-        fontWeight: 700,
+        fontWeight: 800,
       }}
       >
       {page}
@@ -689,7 +893,7 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
     disabled={currentPage === totalPages}
     style={{ display: 'flex', alignItems: 'center', gap: 6 }}
     >
-    Keyingi
+    {!isMobile ? 'Keyingi' : ''}
     <ChevronRight size={16} />
     </Button>
     </div>
@@ -697,6 +901,8 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
 }
 
 export default function App() {
+  const { isMobile, isTablet, isSmallMobile } = useResponsive();
+  
   const [page, setPage] = useState('dashboard');
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
@@ -712,6 +918,7 @@ export default function App() {
     paidOrders: 0,
     pendingPaymentOrders: 0,
   });
+  
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -719,9 +926,14 @@ export default function App() {
   const [orderPage, setOrderPage] = useState(1);
   const [imageMode, setImageMode] = useState('url');
   const [orderTab, setOrderTab] = useState('active');
+  const [paymentFilter, setPaymentFilter] = useState('all');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState('all');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  
   const [isAuth, setIsAuth] = useState(
     localStorage.getItem('admin_auth') === 'true'
   );
+  
   const notifiedOrderIdsRef = useRef(new Set());
   
   const [form, setForm] = useState({
@@ -742,7 +954,6 @@ export default function App() {
       
       const menuData = await menuRes.json();
       const ordersData = await ordersRes.json();
-      
       const safeOrders = Array.isArray(ordersData) ? ordersData : [];
       
       if (playSoundForNew) {
@@ -804,779 +1015,1038 @@ export default function App() {
     };
   }, []);
   
+  useEffect(() => {
+    if (!isMobile) setSidebarOpen(false);
+  }, [isMobile]);
+  
   const filteredOrders = useMemo(() => {
-    return orders.filter((order) =>
+    return orders.filter((order) => {
+      const matchesSearch =
       String(order.name || '').toLowerCase().includes(search.toLowerCase()) ||
-    String(order.id).includes(search) ||
-    String(order.phone || '').includes(search) ||
-    String(order.username || '').toLowerCase().includes(search.toLowerCase()) ||
-    String(order.location?.text || '').toLowerCase().includes(search.toLowerCase()) ||
-    String(order.paymentMethod || '').toLowerCase().includes(search.toLowerCase()) ||
-    String(order.paymentStatus || '').toLowerCase().includes(search.toLowerCase())
+      String(order.id || '').includes(search) ||
+      String(order.phone || '').includes(search) ||
+      String(order.username || '').toLowerCase().includes(search.toLowerCase()) ||
+      String(order.location?.text || '').toLowerCase().includes(search.toLowerCase()) ||
+      String(order.paymentMethod || '').toLowerCase().includes(search.toLowerCase()) ||
+      String(order.paymentStatus || '').toLowerCase().includes(search.toLowerCase());
+      
+      const matchesPayment =
+      paymentFilter === 'all' ||
+      (paymentFilter === 'cash' && (order.paymentMethod || 'cash') === 'cash') ||
+      (paymentFilter === 'click' && order.paymentMethod === 'click');
+      
+      const matchesPaymentStatus =
+      paymentStatusFilter === 'all' ||
+      (paymentStatusFilter === 'paid' && (order.paymentStatus || 'pending') === 'paid') ||
+      (paymentStatusFilter === 'pending' && (order.paymentStatus || 'pending') === 'pending');
+      
+      return matchesSearch && matchesPayment && matchesPaymentStatus;
+    });
+  }, [orders, search, paymentFilter, paymentStatusFilter]);
+  
+  const activeOrders = useMemo(
+    () => filteredOrders.filter((o) => o.status !== 'Yetkazildi'),
+    [filteredOrders]
   );
-}, [orders, search]);
-
-const activeOrders = useMemo(
-  () => filteredOrders.filter((o) => o.status !== 'Yetkazildi'),
-  [filteredOrders]
-);
-
-const historyOrders = useMemo(
-  () => filteredOrders.filter((o) => o.status === 'Yetkazildi'),
-  [filteredOrders]
-);
-
-const currentOrders = useMemo(
-  () => (orderTab === 'active' ? activeOrders : historyOrders),
-  [orderTab, activeOrders, historyOrders]
-);
-
-useEffect(() => {
-  setOrderPage(1);
-}, [search, orderTab]);
-
-const totalOrderPages = Math.max(1, Math.ceil(currentOrders.length / ORDERS_PER_PAGE));
-
-useEffect(() => {
-  if (orderPage > totalOrderPages) {
-    setOrderPage(totalOrderPages);
-  }
-}, [orderPage, totalOrderPages]);
-
-const paginatedOrders = useMemo(() => {
-  const startIndex = (orderPage - 1) * ORDERS_PER_PAGE;
-  const endIndex = startIndex + ORDERS_PER_PAGE;
-  return currentOrders.slice(startIndex, endIndex);
-}, [currentOrders, orderPage]);
-
-const categories = [...new Set(products.map((p) => p.category).filter(Boolean))];
-const dailyStats = useMemo(() => buildDailyStats(orders), [orders]);
-
-async function handleStatusChange(id, status) {
-  try {
-    await fetch(`${API}/orders/${id}/status`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    });
-    
-    await loadData();
-  } catch (error) {
-    console.error('Statusni yangilashda xato:', error);
-  }
-}
-
-async function handlePaymentUpdate(id, payload) {
-  try {
-    await fetch(`${API}/orders/${id}/payment`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    
-    await loadData();
-  } catch (error) {
-    console.error('To‘lovni yangilashda xato:', error);
-  }
-}
-
-async function handleDeleteOrder(id) {
-  const ok = window.confirm("Rostdan ham bu buyurtmani o‘chirmoqchimisiz?");
-  if (!ok) return;
   
-  try {
-    await fetch(`${API}/orders/${id}`, {
-      method: 'DELETE',
-    });
-    
-    await loadData();
-  } catch (error) {
-    console.error('Buyurtmani o‘chirishda xato:', error);
-  }
-}
-
-function openAdd() {
-  setEditingId(null);
-  setImageMode('url');
-  setForm({ id: '', name: '', price: '', category: 'Fast Food', image: '' });
-  setShowForm(true);
-}
-
-function openEdit(product) {
-  setEditingId(product.key);
-  setImageMode(product.image?.startsWith('data:image') ? 'upload' : 'url');
-  setForm({
-    id: product.key,
-    name: product.name,
-    price: String(product.price),
-    category: product.category,
-    image: product.image || '',
-  });
-  setShowForm(true);
-}
-
-async function saveProduct() {
-  const payload = {
-    key: form.id,
-    name: form.name,
-    price: Number(form.price),
-    category: form.category,
-    image: form.image,
-    active: true,
-  };
+  const historyOrders = useMemo(
+    () => filteredOrders.filter((o) => o.status === 'Yetkazildi'),
+    [filteredOrders]
+  );
   
-  try {
-    if (editingId) {
-      await fetch(`${API}/menu/${editingId}`, {
+  const currentOrders = useMemo(
+    () => (orderTab === 'active' ? activeOrders : historyOrders),
+    [orderTab, activeOrders, historyOrders]
+  );
+  
+  useEffect(() => {
+    setOrderPage(1);
+  }, [search, orderTab, paymentFilter, paymentStatusFilter]);
+  
+  const totalOrderPages = Math.max(1, Math.ceil(currentOrders.length / ORDERS_PER_PAGE));
+  
+  useEffect(() => {
+    if (orderPage > totalOrderPages) {
+      setOrderPage(totalOrderPages);
+    }
+  }, [orderPage, totalOrderPages]);
+  
+  const paginatedOrders = useMemo(() => {
+    const startIndex = (orderPage - 1) * ORDERS_PER_PAGE;
+    return currentOrders.slice(startIndex, startIndex + ORDERS_PER_PAGE);
+  }, [currentOrders, orderPage]);
+  
+  const categories = [...new Set(products.map((p) => p.category).filter(Boolean))];
+  const dailyStats = useMemo(() => buildDailyStats(orders), [orders]);
+  
+  async function handleStatusChange(id, status) {
+    try {
+      await fetch(`${API}/orders/${id}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      await loadData();
+    } catch (error) {
+      console.error('Statusni yangilashda xato:', error);
+    }
+  }
+  
+  async function handlePaymentUpdate(id, payload) {
+    try {
+      await fetch(`${API}/orders/${id}/payment`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-    } else {
-      await fetch(`${API}/menu`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      await loadData();
+    } catch (error) {
+      console.error('To‘lovni yangilashda xato:', error);
     }
-    
-    setShowForm(false);
-    await loadData();
-  } catch (error) {
-    console.error('Mahsulotni saqlashda xato:', error);
   }
-}
-
-async function toggleProduct(product) {
-  try {
-    await fetch(`${API}/menu/${product.key}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ active: !product.active }),
+  
+  async function handleDeleteOrder(id) {
+    const ok = window.confirm("Rostdan ham bu buyurtmani o‘chirmoqchimisiz?");
+    if (!ok) return;
+    
+    try {
+      await fetch(`${API}/orders/${id}`, {
+        method: 'DELETE',
+      });
+      await loadData();
+    } catch (error) {
+      console.error('Buyurtmani o‘chirishda xato:', error);
+    }
+  }
+  
+  function openAdd() {
+    setEditingId(null);
+    setImageMode('url');
+    setForm({ id: '', name: '', price: '', category: 'Fast Food', image: '' });
+    setShowForm(true);
+  }
+  
+  function openEdit(product) {
+    setEditingId(product.key);
+    setImageMode(product.image?.startsWith('data:image') ? 'upload' : 'url');
+    setForm({
+      id: product.key,
+      name: product.name,
+      price: String(product.price),
+      category: product.category,
+      image: product.image || '',
     });
-    
-    await loadData();
-  } catch (error) {
-    console.error('Mahsulot holatini o‘zgartirishda xato:', error);
+    setShowForm(true);
   }
-}
-
-async function deleteProduct(product) {
-  try {
-    await fetch(`${API}/menu/${product.key}`, {
-      method: 'DELETE',
-    });
+  
+  async function saveProduct() {
+    const payload = {
+      key: form.id,
+      name: form.name,
+      price: Number(form.price),
+      category: form.category,
+      image: form.image,
+      active: true,
+    };
     
-    await loadData();
-  } catch (error) {
-    console.error('Mahsulotni o‘chirishda xato:', error);
+    try {
+      if (editingId) {
+        await fetch(`${API}/menu/${editingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await fetch(`${API}/menu`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      }
+      
+      setShowForm(false);
+      await loadData();
+    } catch (error) {
+      console.error('Mahsulotni saqlashda xato:', error);
+    }
   }
-}
-
-function handleImageFileChange(file) {
-  if (!file) return;
   
-  const reader = new FileReader();
-  reader.onload = () => {
-    setForm((prev) => ({
-      ...prev,
-      image: String(reader.result || '')
-    }));
-  };
-  reader.readAsDataURL(file);
-}
-
-function handleLogout() {
-  localStorage.removeItem('admin_auth');
-  setIsAuth(false);
-}
-
-if (!isAuth) {
-  return <Login onLogin={() => setIsAuth(true)} />;
-}
-
-return (
-  <div
-  style={{
-    minHeight: '100vh',
-    background: '#f1f5f9',
-    padding: 24,
-    fontFamily: 'Arial, sans-serif',
-  }}
-  >
-  <div
-  style={{
-    maxWidth: 1400,
-    margin: '0 auto',
-    display: 'grid',
-    gridTemplateColumns: '260px 1fr',
-    gap: 24,
-  }}
-  >
-  <Card style={{ height: 'fit-content', position: 'sticky', top: 24 }}>
-  <div
-  style={{
-    marginBottom: 24,
-    padding: 16,
-    borderRadius: 20,
-    background: '#0f172a',
-    color: '#fff',
-    display: 'flex',
-    gap: 12,
-    alignItems: 'center',
-  }}
-  >
-  <div
-  style={{
-    width: 48,
-    height: 48,
-    display: 'grid',
-    placeItems: 'center',
-    borderRadius: 16,
-    background: 'rgba(255,255,255,0.1)',
-  }}
-  >
-  <UtensilsCrossed />
-  </div>
-  <div>
-  <div style={{ fontSize: 13, color: '#cbd5e1' }}>Restaurant Admin</div>
-  <div style={{ fontSize: 20, fontWeight: 800 }}>Shovot Lavka</div>
-  </div>
-  </div>
+  async function toggleProduct(product) {
+    try {
+      await fetch(`${API}/menu/${product.key}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: !product.active }),
+      });
+      await loadData();
+    } catch (error) {
+      console.error('Mahsulot holatini o‘zgartirishda xato:', error);
+    }
+  }
   
-  <div style={{ display: 'grid', gap: 8 }}>
-  <SidebarItem
-  active={page === 'dashboard'}
-  icon={LayoutDashboard}
-  label="Dashboard"
-  onClick={() => setPage('dashboard')}
-  />
-  <SidebarItem
-  active={page === 'orders'}
-  icon={ShoppingBag}
-  label="Buyurtmalar"
-  onClick={() => setPage('orders')}
-  />
-  <SidebarItem
-  active={page === 'products'}
-  icon={Package}
-  label="Mahsulotlar"
-  onClick={() => setPage('products')}
-  />
-  <SidebarItem
-  active={page === 'stats'}
-  icon={BarChart3}
-  label="Statistika"
-  onClick={() => setPage('stats')}
-  />
-  <SidebarItem
-  active={false}
-  icon={LogOut}
-  label="Logout"
-  onClick={handleLogout}
-  />
-  </div>
-  </Card>
+  async function deleteProduct(product) {
+    try {
+      await fetch(`${API}/menu/${product.key}`, {
+        method: 'DELETE',
+      });
+      await loadData();
+    } catch (error) {
+      console.error('Mahsulotni o‘chirishda xato:', error);
+    }
+  }
   
-  <div style={{ display: 'grid', gap: 24 }}>
-  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}>
-  <div>
-  <div style={{ fontSize: 34, fontWeight: 800, color: '#0f172a' }}>Admin Panel</div>
-  <div style={{ color: '#64748b', marginTop: 6 }}>
-  Buyurtmalar, mahsulotlar va to‘lovlar real ma’lumotlar bilan ishlayapti.
-  </div>
-  <div style={{ color: '#16a34a', marginTop: 6, fontSize: 13 }}>
-  {streamStatus}
-  </div>
-  </div>
-  
-  <div style={{ position: 'relative', width: 320 }}>
-  <Search size={16} style={{ position: 'absolute', left: 12, top: 14, color: '#94a3b8' }} />
-  <Input
-  value={search}
-  onChange={(e) => setSearch(e.target.value)}
-  placeholder="Qidirish..."
-  style={{ paddingLeft: 36 }}
-  />
-  </div>
-  </div>
-  
-  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-  <StatCard title="Jami buyurtmalar" value={statsData?.totalOrders ?? 0} icon={ShoppingBag} helper="Barcha buyurtmalar" />
-  <StatCard title="Yangi" value={statsData?.newOrders ?? 0} icon={Bell} helper="Yangi tushganlar" />
-  <StatCard title="Naqd tushum" value={formatPrice(statsData?.cashRevenue ?? 0)} icon={Banknote} helper="Cash" />
-  <StatCard title="Click tushum" value={formatPrice(statsData?.clickRevenue ?? 0)} icon={CreditCard} helper="Click" />
-  </div>
-  
-  {page === 'dashboard' && (
-    <Card>
-    <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 16 }}>So‘nggi buyurtmalar</div>
-    <div style={{ display: 'grid', gap: 16 }}>
-    {filteredOrders.slice(0, 3).map((order) => (
-      <OrderCard
-      key={order.id}
-      order={order}
-      onStatusChange={handleStatusChange}
-      onDeleteOrder={handleDeleteOrder}
-      onPaymentUpdate={handlePaymentUpdate}
-      />
-    ))}
-    </div>
-    </Card>
-  )}
-  
-  {page === 'orders' && (
-    <Card>
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 16 }}>
-    <div style={{ fontSize: 22, fontWeight: 800 }}>Buyurtmalar</div>
-    <div style={{ color: '#64748b', fontSize: 14 }}>
-    Har sahifada {ORDERS_PER_PAGE} ta buyurtma
-    </div>
-    </div>
+  function handleImageFileChange(file) {
+    if (!file) return;
     
-    <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-    <Button
-    onClick={() => setOrderTab('active')}
+    const reader = new FileReader();
+    reader.onload = () => {
+      setForm((prev) => ({
+        ...prev,
+        image: String(reader.result || '')
+      }));
+    };
+    reader.readAsDataURL(file);
+  }
+  
+  function handleLogout() {
+    localStorage.removeItem('admin_auth');
+    setIsAuth(false);
+  }
+  
+  function handleMenuClick(nextPage) {
+    setPage(nextPage);
+    if (isMobile) setSidebarOpen(false);
+  }
+  
+  const mainGridColumns = isMobile ? '1fr' : '280px 1fr';
+  const topStatsGrid = isMobile
+  ? '1fr'
+  : isTablet
+  ? 'repeat(2, 1fr)'
+  : 'repeat(4, 1fr)';
+  const dashboardQuickGrid = isMobile
+  ? '1fr'
+  : isTablet
+  ? 'repeat(2, 1fr)'
+  : 'repeat(4, 1fr)';
+  const productGrid = isMobile
+  ? '1fr'
+  : isTablet
+  ? 'repeat(2, 1fr)'
+  : 'repeat(3, 1fr)';
+  const statsGrid4 = isMobile
+  ? '1fr'
+  : isTablet
+  ? 'repeat(2, 1fr)'
+  : 'repeat(4, 1fr)';
+  const statsGrid3 = isMobile
+  ? '1fr'
+  : isTablet
+  ? 'repeat(2, 1fr)'
+  : 'repeat(3, 1fr)';
+  
+  if (!isAuth) {
+    return <Login onLogin={() => setIsAuth(true)} />;
+  }
+  
+  return (
+    <div
     style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 8,
-      background: orderTab === 'active' ? '#0f172a' : '#e2e8f0',
-      color: orderTab === 'active' ? '#fff' : '#0f172a',
+      minHeight: '100vh',
+      background: '#f3f6fb',
+      padding: isMobile ? 14 : 22,
+      fontFamily: 'Arial, sans-serif',
     }}
     >
-    <ClipboardList size={16} />
-    Active Orders
-    </Button>
-    
-    <Button
-    onClick={() => setOrderTab('history')}
-    style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 8,
-      background: orderTab === 'history' ? '#0f172a' : '#e2e8f0',
-      color: orderTab === 'history' ? '#fff' : '#0f172a',
-    }}
-    >
-    <History size={16} />
-    History
-    </Button>
-    </div>
-    
-    <div style={{ display: 'grid', gap: 16 }}>
-    {paginatedOrders.map((order) => (
-      <OrderCard
-      key={order.id}
-      order={order}
-      onStatusChange={handleStatusChange}
-      onDeleteOrder={handleDeleteOrder}
-      onPaymentUpdate={handlePaymentUpdate}
-      hideActions={orderTab === 'history'}
-      />
-    ))}
-    </div>
-    
-    {currentOrders.length === 0 && (
-      <div style={{ textAlign: 'center', padding: '30px 0', color: '#64748b' }}>
-      Buyurtma topilmadi
+    {isMobile && (
+      <div
+      style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 50,
+        marginBottom: 14,
+      }}
+      >
+      <Card
+      style={{
+        padding: 14,
+        borderRadius: 20,
+      }}
+      >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+      <div>
+      <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a' }}>Admin Panel</div>
+      <div style={{ fontSize: 12, color: '#16a34a', marginTop: 4 }}>{streamStatus}</div>
+      </div>
+      
+      <button
+      onClick={() => setSidebarOpen((prev) => !prev)}
+      style={{
+        width: 44,
+        height: 44,
+        borderRadius: 14,
+        border: 'none',
+        background: '#0f172a',
+        color: '#ffffff',
+        display: 'grid',
+        placeItems: 'center',
+        cursor: 'pointer',
+      }}
+      >
+      {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
+      </div>
+      </Card>
       </div>
     )}
     
-    <Pagination
-    currentPage={orderPage}
-    totalPages={totalOrderPages}
-    onPageChange={setOrderPage}
-    />
-    </Card>
-  )}
-  
-  {page === 'products' && (
-    <Card>
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 20 }}>
-    <div style={{ fontSize: 22, fontWeight: 800 }}>Mahsulotlar</div>
-    <Button onClick={openAdd} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-    <Plus size={16} /> Mahsulot qo‘shish
-    </Button>
-    </div>
-    
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-    {products.map((product) => (
-      <Card key={product.key} style={{ padding: 0, overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: 'none' }}>
-      <div style={{ aspectRatio: '16 / 10', background: '#e2e8f0' }}>
-      {product.image ? (
-        <img
-        src={product.image}
-        alt={product.name}
-        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+    <div
+    style={{
+      maxWidth: 1500,
+      margin: '0 auto',
+      display: 'grid',
+      gridTemplateColumns: mainGridColumns,
+      gap: 22,
+    }}
+    >
+    {(!isMobile || sidebarOpen) && (
+      <>
+      {isMobile && (
+        <div
+        onClick={() => setSidebarOpen(false)}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15,23,42,0.35)',
+          zIndex: 90,
+        }}
         />
-      ) : null}
-      </div>
+      )}
       
-      <div style={{ padding: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+      <div
+      style={{
+        position: isMobile ? 'fixed' : 'sticky',
+        top: isMobile ? 0 : 22,
+        left: isMobile ? 0 : 'auto',
+        bottom: isMobile ? 0 : 'auto',
+        width: isMobile ? '82%' : 'auto',
+        maxWidth: isMobile ? 320 : 'none',
+        zIndex: isMobile ? 100 : 'auto',
+        height: isMobile ? '100vh' : 'fit-content',
+        overflowY: 'auto',
+      }}
+      >
+      <Card style={{ height: 'fit-content', minHeight: isMobile ? '100vh' : 'auto', borderRadius: isMobile ? 0 : 24 }}>
+      <div
+      style={{
+        marginBottom: 24,
+        padding: 18,
+        borderRadius: 22,
+        background: '#0f172a',
+        color: '#ffffff',
+        display: 'flex',
+        gap: 12,
+        alignItems: 'center',
+      }}
+      >
+      <div
+      style={{
+        width: 52,
+        height: 52,
+        display: 'grid',
+        placeItems: 'center',
+        borderRadius: 16,
+        background: 'rgba(255,255,255,0.08)',
+      }}
+      >
+      <UtensilsCrossed />
+      </div>
       <div>
-      <div style={{ fontWeight: 700, fontSize: 18 }}>{product.name}</div>
-      <div style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>{product.category}</div>
+      <div style={{ fontSize: 13, color: '#cbd5e1' }}>Restaurant Admin</div>
+      <div style={{ fontSize: 24, fontWeight: 800 }}>Shovot Lavka</div>
+      </div>
       </div>
       
-      <span
+      <div style={{ display: 'grid', gap: 8 }}>
+      <SidebarItem
+      active={page === 'dashboard'}
+      icon={LayoutDashboard}
+      label="Dashboard"
+      onClick={() => handleMenuClick('dashboard')}
+      />
+      <SidebarItem
+      active={page === 'orders'}
+      icon={ShoppingBag}
+      label="Buyurtmalar"
+      onClick={() => handleMenuClick('orders')}
+      />
+      <SidebarItem
+      active={page === 'products'}
+      icon={Package}
+      label="Mahsulotlar"
+      onClick={() => handleMenuClick('products')}
+      />
+      <SidebarItem
+      active={page === 'stats'}
+      icon={BarChart3}
+      label="Statistika"
+      onClick={() => handleMenuClick('stats')}
+      />
+      <SidebarItem
+      active={false}
+      icon={LogOut}
+      label="Logout"
+      onClick={handleLogout}
+      />
+      </div>
+      </Card>
+      </div>
+      </>
+    )}
+    
+    <div style={{ display: 'grid', gap: 22 }}>
+    {!isMobile && (
+      <Card>
+      <div
       style={{
-        height: 'fit-content',
-        padding: '6px 10px',
-        borderRadius: 999,
-        background: product.active ? '#d1fae5' : '#e2e8f0',
-        color: product.active ? '#047857' : '#475569',
-        fontWeight: 700,
-        fontSize: 12,
-      }}
-      >
-      {product.active ? 'Aktiv' : 'Yashirin'}
-      </span>
-      </div>
-      
-      <div style={{ marginTop: 12, fontSize: 24, fontWeight: 800 }}>
-      {formatPrice(product.price)}
-      </div>
-      
-      <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
-      <Button
-      onClick={() => openEdit(product)}
-      style={{
-        flex: 1,
-        background: '#e2e8f0',
-        color: '#0f172a',
         display: 'flex',
+        justifyContent: 'space-between',
+        gap: 16,
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
+        flexWrap: 'wrap',
       }}
       >
-      <Pencil size={16} /> Tahrirlash
-      </Button>
+      <div>
+      <div style={{ fontSize: 38, fontWeight: 800, color: '#0f172a' }}>Admin Panel</div>
+      <div style={{ color: '#64748b', marginTop: 6 }}>
+      Buyurtmalar, mahsulotlar va to‘lovlar real ma’lumotlar bilan ishlayapti.
+      </div>
+      <div style={{ color: '#16a34a', marginTop: 6, fontSize: 13, fontWeight: 700 }}>
+      {streamStatus}
+      </div>
+      </div>
       
-      <Button
-      onClick={() => toggleProduct(product)}
-      style={{
-        flex: 1,
-        background: '#fff',
-        color: '#0f172a',
-        border: '1px solid #cbd5e1',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-      }}
-      >
-      {product.active ? <PowerOff size={16} /> : <Power size={16} />}
-      {product.active ? 'Yashirish' : 'Ochish'}
-      </Button>
-      
-      <Button
-      onClick={() => deleteProduct(product)}
-      style={{
-        width: '100%',
-        background: '#fee2e2',
-        color: '#991b1b',
-      }}
-      >
-      O‘chirish
-      </Button>
+      <div style={{ position: 'relative', width: 340, maxWidth: '100%' }}>
+      <Search size={16} style={{ position: 'absolute', left: 12, top: 14, color: '#94a3b8' }} />
+      <Input
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      placeholder="Qidirish..."
+      style={{ paddingLeft: 36 }}
+      />
       </div>
       </div>
       </Card>
-    ))}
-    </div>
-    </Card>
-  )}
-  
-  {page === 'stats' && (
-    <div style={{ display: 'grid', gap: 24 }}>
-    <Card>
-    <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 20 }}>Umumiy statistika</div>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-    <div style={{ padding: 18, borderRadius: 20, background: '#f8fafc' }}>
-    <div style={{ fontSize: 14, color: '#64748b' }}>Qabul qilingan</div>
-    <div style={{ marginTop: 10, fontSize: 28, fontWeight: 800 }}>
-    {statsData?.acceptedOrders ?? 0}
-    </div>
-    </div>
-    <div style={{ padding: 18, borderRadius: 20, background: '#f8fafc' }}>
-    <div style={{ fontSize: 14, color: '#64748b' }}>Tayyor</div>
-    <div style={{ marginTop: 10, fontSize: 28, fontWeight: 800 }}>
-    {statsData?.readyOrders ?? 0}
-    </div>
-    </div>
-    <div style={{ padding: 18, borderRadius: 20, background: '#f8fafc' }}>
-    <div style={{ fontSize: 14, color: '#64748b' }}>To‘langan buyurtmalar</div>
-    <div style={{ marginTop: 10, fontSize: 28, fontWeight: 800 }}>
-    {statsData?.paidOrders ?? 0}
-    </div>
-    </div>
-    <div style={{ padding: 18, borderRadius: 20, background: '#f8fafc' }}>
-    <div style={{ fontSize: 14, color: '#64748b' }}>To‘lov kutilmoqda</div>
-    <div style={{ marginTop: 10, fontSize: 28, fontWeight: 800 }}>
-    {statsData?.pendingPaymentOrders ?? 0}
-    </div>
-    </div>
-    </div>
-    </Card>
+    )}
     
-    <Card>
-    <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 20 }}>Har kunlik statistika</div>
+    {isMobile && (
+      <Card>
+      <div style={{ position: 'relative', width: '100%' }}>
+      <Search size={16} style={{ position: 'absolute', left: 12, top: 14, color: '#94a3b8' }} />
+      <Input
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      placeholder="Qidirish..."
+      style={{ paddingLeft: 36 }}
+      />
+      </div>
+      </Card>
+    )}
     
-    {dailyStats.length === 0 ? (
-      <div style={{ color: '#64748b' }}>Hozircha kunlik statistika yo‘q</div>
-    ) : (
-      <div style={{ display: 'grid', gap: 16 }}>
-      {dailyStats.map((day) => (
-        <div
-        key={day.dateKey}
-        style={{
-          border: '1px solid #e2e8f0',
-          borderRadius: 20,
-          padding: 18,
-          background: '#fff',
-        }}
-        >
-        <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          gap: 16,
-          alignItems: 'center',
-          marginBottom: 16,
-          flexWrap: 'wrap',
-        }}
-        >
-        <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>
-        {day.dateLabel}
-        </div>
-        <div
-        style={{
-          padding: '8px 12px',
-          borderRadius: 999,
-          background: '#eff6ff',
-          color: '#1d4ed8',
-          fontWeight: 700,
-          fontSize: 13,
-        }}
-        >
-        {day.totalOrders} ta zakaz
-        </div>
-        </div>
-        
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-        <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
-        <div style={{ fontSize: 13, color: '#64748b' }}>Kunlik jami zakaz</div>
-        <div style={{ marginTop: 8, fontSize: 24, fontWeight: 800 }}>{day.totalOrders}</div>
-        </div>
-        
-        <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
-        <div style={{ fontSize: 13, color: '#64748b' }}>Kunlik daromad</div>
-        <div style={{ marginTop: 8, fontSize: 24, fontWeight: 800 }}>
-        {formatPrice(day.revenue)}
-        </div>
-        </div>
-        
-        <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
-        <div style={{ fontSize: 13, color: '#64748b' }}>Naqd tushum</div>
-        <div style={{ marginTop: 8, fontSize: 24, fontWeight: 800 }}>
-        {formatPrice(day.cashRevenue)}
-        </div>
-        </div>
-        
-        <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
-        <div style={{ fontSize: 13, color: '#64748b' }}>Click tushum</div>
-        <div style={{ marginTop: 8, fontSize: 24, fontWeight: 800 }}>
-        {formatPrice(day.clickRevenue)}
-        </div>
-        </div>
-        </div>
-        
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginTop: 14 }}>
-        <div style={{ padding: 14, borderRadius: 16, background: '#eff6ff', color: '#1d4ed8', fontWeight: 700 }}>
-        Yangi: {day.newOrders}
-        </div>
-        <div style={{ padding: 14, borderRadius: 16, background: '#fef3c7', color: '#b45309', fontWeight: 700 }}>
-        Qabul qilindi: {day.acceptedOrders}
-        </div>
-        <div style={{ padding: 14, borderRadius: 16, background: '#ede9fe', color: '#6d28d9', fontWeight: 700 }}>
-        Tayyor: {day.readyOrders}
-        </div>
-        <div style={{ padding: 14, borderRadius: 16, background: '#d1fae5', color: '#047857', fontWeight: 700 }}>
-        Yetkazildi: {day.deliveredOrders}
-        </div>
-        </div>
-        
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 12 }}>
-        <div style={{ padding: 14, borderRadius: 16, background: '#ecfdf5', color: '#047857', fontWeight: 700 }}>
-        To‘langan: {day.paidOrders}
-        </div>
-        <div style={{ padding: 14, borderRadius: 16, background: '#fffbeb', color: '#b45309', fontWeight: 700 }}>
-        Kutilmoqda: {day.pendingPaymentOrders}
-        </div>
-        <div style={{ padding: 14, borderRadius: 16, background: '#f8fafc', color: '#0f172a', fontWeight: 700 }}>
-        Yetkazilgan daromad: {formatPrice(day.deliveredRevenue)}
-        </div>
-        </div>
-        </div>
+    <div style={{ display: 'grid', gridTemplateColumns: topStatsGrid, gap: 16 }}>
+    <StatCard
+    title="Jami buyurtmalar"
+    value={statsData?.totalOrders ?? 0}
+    icon={ShoppingBag}
+    helper="Barcha buyurtmalar"
+    />
+    <StatCard
+    title="Yangi"
+    value={statsData?.newOrders ?? 0}
+    icon={Bell}
+    helper="Yangi tushganlar"
+    />
+    <StatCard
+    title="Naqd tushum"
+    value={formatPrice(statsData?.cashRevenue ?? 0)}
+    icon={Banknote}
+    helper="Cash"
+    />
+    <StatCard
+    title="Click tushum"
+    value={formatPrice(statsData?.clickRevenue ?? 0)}
+    icon={CreditCard}
+    helper="Click"
+    dark
+    />
+    </div>
+    
+    {page === 'dashboard' && (
+      <>
+      <Card>
+      <SectionTitle
+      title="Qisqa ko‘rsatkichlar"
+      subtitle="Eng muhim ma’lumotlar shu yerda"
+      isMobile={isMobile}
+      />
+      
+      <div style={{ display: 'grid', gridTemplateColumns: dashboardQuickGrid, gap: 16, marginTop: 18 }}>
+      <div style={{ padding: 18, borderRadius: 20, background: '#eff6ff' }}>
+      <div style={{ color: '#1d4ed8', fontWeight: 700, fontSize: 13 }}>Aktiv buyurtmalar</div>
+      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800, color: '#0f172a' }}>
+      {orders.filter((o) => o.status !== 'Yetkazildi').length}
+      </div>
+      </div>
+      
+      <div style={{ padding: 18, borderRadius: 20, background: '#ecfdf5' }}>
+      <div style={{ color: '#047857', fontWeight: 700, fontSize: 13 }}>Yetkazilganlar</div>
+      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800, color: '#0f172a' }}>
+      {statsData?.deliveredOrders ?? 0}
+      </div>
+      </div>
+      
+      <div style={{ padding: 18, borderRadius: 20, background: '#fefce8' }}>
+      <div style={{ color: '#a16207', fontWeight: 700, fontSize: 13 }}>To‘lov kutilmoqda</div>
+      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800, color: '#0f172a' }}>
+      {statsData?.pendingPaymentOrders ?? 0}
+      </div>
+      </div>
+      
+      <div style={{ padding: 18, borderRadius: 20, background: '#f5f3ff' }}>
+      <div style={{ color: '#6d28d9', fontWeight: 700, fontSize: 13 }}>To‘langanlar</div>
+      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800, color: '#0f172a' }}>
+      {statsData?.paidOrders ?? 0}
+      </div>
+      </div>
+      </div>
+      </Card>
+      
+      <Card>
+      <SectionTitle
+      title="So‘nggi buyurtmalar"
+      subtitle="Oxirgi 3 ta buyurtma"
+      isMobile={isMobile}
+      />
+      
+      <div style={{ display: 'grid', gap: 16, marginTop: 18 }}>
+      {filteredOrders.slice(0, 3).map((order) => (
+        <OrderCard
+        key={order.id}
+        order={order}
+        onStatusChange={handleStatusChange}
+        onDeleteOrder={handleDeleteOrder}
+        onPaymentUpdate={handlePaymentUpdate}
+        isMobile={isMobile}
+        isTablet={isTablet}
+        />
       ))}
       </div>
-    )}
-    </Card>
-    </div>
-  )}
-  </div>
-  </div>
-  
-  {showForm && (
-    <div
-    onClick={() => setShowForm(false)}
-    style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'rgba(15,23,42,0.4)',
-      display: 'grid',
-      placeItems: 'center',
-      padding: 20,
-    }}
-    >
-    <div
-    onClick={(e) => e.stopPropagation()}
-    style={{
-      width: '100%',
-      maxWidth: 560,
-      background: '#fff',
-      borderRadius: 28,
-      padding: 24,
-      boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
-    }}
-    >
-    <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 18 }}>
-    {editingId ? 'Mahsulotni tahrirlash' : 'Yangi mahsulot qo‘shish'}
-    </div>
-    
-    <div style={{ display: 'grid', gap: 14 }}>
-    <Input
-    placeholder="ID / key"
-    value={form.id}
-    onChange={(e) => setForm((prev) => ({ ...prev, id: e.target.value }))}
-    />
-    
-    <Input
-    placeholder="Mahsulot nomi"
-    value={form.name}
-    onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-    />
-    
-    <Input
-    placeholder="Narxi"
-    type="number"
-    value={form.price}
-    onChange={(e) => setForm((prev) => ({ ...prev, price: e.target.value }))}
-    />
-    
-    <Input
-    placeholder="Kategoriya"
-    value={form.category}
-    onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
-    />
-    
-    <div style={{ display: 'flex', gap: 10 }}>
-    <Button
-    onClick={() => setImageMode('url')}
-    style={{
-      flex: 1,
-      background: imageMode === 'url' ? '#0f172a' : '#e2e8f0',
-      color: imageMode === 'url' ? '#fff' : '#0f172a',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-    }}
-    >
-    <LinkIcon size={16} />
-    URL bilan
-    </Button>
-    
-    <Button
-    onClick={() => setImageMode('upload')}
-    style={{
-      flex: 1,
-      background: imageMode === 'upload' ? '#0f172a' : '#e2e8f0',
-      color: imageMode === 'upload' ? '#fff' : '#0f172a',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-    }}
-    >
-    <Upload size={16} />
-    Upload
-    </Button>
-    </div>
-    
-    {imageMode === 'url' ? (
-      <Input
-      placeholder="Rasm URL"
-      value={form.image}
-      onChange={(e) => setForm((prev) => ({ ...prev, image: e.target.value }))}
-      />
-    ) : (
-      <input
-      type="file"
-      accept="image/*"
-      onChange={(e) => handleImageFileChange(e.target.files?.[0])}
-      style={{
-        width: '100%',
-        padding: '12px 14px',
-        borderRadius: 16,
-        border: '1px solid #e2e8f0',
-        outline: 'none',
-        fontSize: 14,
-        background: '#fff',
-      }}
-      />
+      </Card>
+      </>
     )}
     
-    {form.image ? (
+    {page === 'orders' && (
+      <Card>
+      <SectionTitle
+      title="Buyurtmalar"
+      subtitle={`Har sahifada ${ORDERS_PER_PAGE} ta buyurtma`}
+      isMobile={isMobile}
+      />
+      
+      <div style={{ marginTop: 18, display: 'grid', gap: 14 }}>
       <div
       style={{
-        border: '1px solid #e2e8f0',
+        display: 'grid',
+        gap: 12,
+        padding: 14,
         borderRadius: 18,
-        padding: 12,
         background: '#f8fafc',
+        border: '1px solid #eef2f7',
       }}
       >
-      <div style={{ fontSize: 13, color: '#64748b', marginBottom: 10 }}>Rasm preview</div>
-      <img
-      src={form.image}
-      alt="preview"
-      style={{
-        width: '100%',
-        maxHeight: 220,
-        objectFit: 'contain',
-        borderRadius: 14,
-        background: '#fff',
-      }}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+      <Filter size={16} />
+      <FilterChip active={orderTab === 'active'} onClick={() => setOrderTab('active')}>
+      Active
+      </FilterChip>
+      <FilterChip active={orderTab === 'history'} onClick={() => setOrderTab('history')}>
+      History
+      </FilterChip>
+      </div>
+      
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+      <FilterChip active={paymentFilter === 'all'} onClick={() => setPaymentFilter('all')}>
+      Barcha to‘lovlar
+      </FilterChip>
+      <FilterChip active={paymentFilter === 'cash'} onClick={() => setPaymentFilter('cash')}>
+      Naqd
+      </FilterChip>
+      <FilterChip active={paymentFilter === 'click'} onClick={() => setPaymentFilter('click')}>
+      Click
+      </FilterChip>
+      </div>
+      
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+      <FilterChip active={paymentStatusFilter === 'all'} onClick={() => setPaymentStatusFilter('all')}>
+      Hammasi
+      </FilterChip>
+      <FilterChip active={paymentStatusFilter === 'paid'} onClick={() => setPaymentStatusFilter('paid')}>
+      To‘langan
+      </FilterChip>
+      <FilterChip active={paymentStatusFilter === 'pending'} onClick={() => setPaymentStatusFilter('pending')}>
+      Kutilmoqda
+      </FilterChip>
+      </div>
+      </div>
+      
+      <div style={{ display: 'grid', gap: 16 }}>
+      {paginatedOrders.map((order) => (
+        <OrderCard
+        key={order.id}
+        order={order}
+        onStatusChange={handleStatusChange}
+        onDeleteOrder={handleDeleteOrder}
+        onPaymentUpdate={handlePaymentUpdate}
+        hideActions={orderTab === 'history'}
+        isMobile={isMobile}
+        isTablet={isTablet}
+        />
+      ))}
+      </div>
+      
+      {currentOrders.length === 0 && (
+        <div
+        style={{
+          textAlign: 'center',
+          padding: '40px 0',
+          color: '#64748b',
+          fontWeight: 700,
+        }}
+        >
+        Buyurtma topilmadi
+        </div>
+      )}
+      
+      <Pagination
+      currentPage={orderPage}
+      totalPages={totalOrderPages}
+      onPageChange={setOrderPage}
+      isMobile={isMobile}
       />
       </div>
-    ) : null}
+      </Card>
+    )}
+    
+    {page === 'products' && (
+      <Card>
+      <SectionTitle
+      title="Mahsulotlar"
+      subtitle={`${products.length} ta mahsulot`}
+      isMobile={isMobile}
+      right={
+        <Button onClick={openAdd} style={{ display: 'flex', alignItems: 'center', gap: 8, width: isMobile ? '100%' : 'auto', justifyContent: 'center' }}>
+        <Plus size={16} /> Mahsulot qo‘shish
+        </Button>
+      }
+      />
+      
+      <div style={{ marginTop: 18, display: 'grid', gridTemplateColumns: productGrid, gap: 16 }}>
+      {products.map((product) => (
+        <Card
+        key={product.key}
+        style={{
+          padding: 0,
+          overflow: 'hidden',
+          border: '1px solid #e5e7eb',
+          boxShadow: 'none',
+        }}
+        >
+        <div style={{ aspectRatio: '16 / 10', background: '#e2e8f0' }}>
+        {product.image ? (
+          <img
+          src={product.image}
+          alt={product.name}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : null}
+        </div>
+        
+        <div style={{ padding: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+        <div>
+        <div style={{ fontWeight: 800, fontSize: 18, color: '#0f172a' }}>{product.name}</div>
+        <div style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>{product.category}</div>
+        </div>
+        
+        <span
+        style={{
+          height: 'fit-content',
+          padding: '6px 10px',
+          borderRadius: 999,
+          background: product.active ? '#d1fae5' : '#e2e8f0',
+          color: product.active ? '#047857' : '#475569',
+          fontWeight: 800,
+          fontSize: 12,
+        }}
+        >
+        {product.active ? 'Aktiv' : 'Yashirin'}
+        </span>
+        </div>
+        
+        <div style={{ marginTop: 14, fontSize: 26, fontWeight: 800, color: '#0f172a' }}>
+        {formatPrice(product.price)}
+        </div>
+        
+        <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+        <Button
+        onClick={() => openEdit(product)}
+        style={{
+          flex: 1,
+          background: '#e2e8f0',
+          color: '#0f172a',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          minWidth: isSmallMobile ? '100%' : 'auto',
+        }}
+        >
+        <Pencil size={16} /> Tahrirlash
+        </Button>
+        
+        <Button
+        onClick={() => toggleProduct(product)}
+        style={{
+          flex: 1,
+          background: '#ffffff',
+          color: '#0f172a',
+          border: '1px solid #cbd5e1',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          minWidth: isSmallMobile ? '100%' : 'auto',
+        }}
+        >
+        {product.active ? <PowerOff size={16} /> : <Power size={16} />}
+        {product.active ? 'Yashirish' : 'Ochish'}
+        </Button>
+        
+        <Button
+        onClick={() => deleteProduct(product)}
+        style={{
+          width: '100%',
+          background: '#fee2e2',
+          color: '#991b1b',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+        }}
+        >
+        <Trash2 size={16} /> O‘chirish
+        </Button>
+        </div>
+        </div>
+        </Card>
+      ))}
+      </div>
+      </Card>
+    )}
+    
+    {page === 'stats' && (
+      <div style={{ display: 'grid', gap: 22 }}>
+      <Card>
+      <SectionTitle
+      title="Umumiy statistika"
+      subtitle="Buyurtmalar va to‘lovlar bo‘yicha"
+      isMobile={isMobile}
+      />
+      
+      <div style={{ marginTop: 18, display: 'grid', gridTemplateColumns: statsGrid4, gap: 16 }}>
+      <div style={{ padding: 18, borderRadius: 20, background: '#f8fafc' }}>
+      <div style={{ fontSize: 14, color: '#64748b' }}>Qabul qilingan</div>
+      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800 }}>{statsData?.acceptedOrders ?? 0}</div>
+      </div>
+      
+      <div style={{ padding: 18, borderRadius: 20, background: '#f8fafc' }}>
+      <div style={{ fontSize: 14, color: '#64748b' }}>Tayyor</div>
+      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800 }}>{statsData?.readyOrders ?? 0}</div>
+      </div>
+      
+      <div style={{ padding: 18, borderRadius: 20, background: '#f8fafc' }}>
+      <div style={{ fontSize: 14, color: '#64748b' }}>To‘langan buyurtmalar</div>
+      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800 }}>{statsData?.paidOrders ?? 0}</div>
+      </div>
+      
+      <div style={{ padding: 18, borderRadius: 20, background: '#f8fafc' }}>
+      <div style={{ fontSize: 14, color: '#64748b' }}>To‘lov kutilmoqda</div>
+      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800 }}>{statsData?.pendingPaymentOrders ?? 0}</div>
+      </div>
+      </div>
+      </Card>
+      
+      <Card>
+      <SectionTitle
+      title="Har kunlik statistika"
+      subtitle="Kunlar bo‘yicha tushum va zakazlar"
+      isMobile={isMobile}
+      />
+      
+      {dailyStats.length === 0 ? (
+        <div style={{ marginTop: 18, color: '#64748b' }}>Hozircha kunlik statistika yo‘q</div>
+      ) : (
+        <div style={{ display: 'grid', gap: 16, marginTop: 18 }}>
+        {dailyStats.map((day) => (
+          <div
+          key={day.dateKey}
+          style={{
+            border: '1px solid #e5e7eb',
+            borderRadius: 22,
+            padding: isMobile ? 14 : 18,
+            background: '#ffffff',
+          }}
+          >
+          <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: 16,
+            alignItems: isMobile ? 'flex-start' : 'center',
+            marginBottom: 16,
+            flexWrap: 'wrap',
+            flexDirection: isMobile ? 'column' : 'row',
+          }}
+          >
+          <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: '#0f172a' }}>
+          {day.dateLabel}
+          </div>
+          
+          <div
+          style={{
+            padding: '8px 12px',
+            borderRadius: 999,
+            background: '#eff6ff',
+            color: '#1d4ed8',
+            fontWeight: 800,
+            fontSize: 13,
+          }}
+          >
+          {day.totalOrders} ta zakaz
+          </div>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: statsGrid4, gap: 14 }}>
+          <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
+          <div style={{ fontSize: 13, color: '#64748b' }}>Kunlik jami zakaz</div>
+          <div style={{ marginTop: 8, fontSize: 26, fontWeight: 800 }}>{day.totalOrders}</div>
+          </div>
+          
+          <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
+          <div style={{ fontSize: 13, color: '#64748b' }}>Kunlik daromad</div>
+          <div style={{ marginTop: 8, fontSize: 26, fontWeight: 800 }}>{formatPrice(day.revenue)}</div>
+          </div>
+          
+          <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
+          <div style={{ fontSize: 13, color: '#64748b' }}>Naqd tushum</div>
+          <div style={{ marginTop: 8, fontSize: 26, fontWeight: 800 }}>{formatPrice(day.cashRevenue)}</div>
+          </div>
+          
+          <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
+          <div style={{ fontSize: 13, color: '#64748b' }}>Click tushum</div>
+          <div style={{ marginTop: 8, fontSize: 26, fontWeight: 800 }}>{formatPrice(day.clickRevenue)}</div>
+          </div>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: statsGrid4, gap: 12, marginTop: 14 }}>
+          <div style={{ padding: 14, borderRadius: 16, background: '#eff6ff', color: '#1d4ed8', fontWeight: 800 }}>
+          Yangi: {day.newOrders}
+          </div>
+          <div style={{ padding: 14, borderRadius: 16, background: '#fef3c7', color: '#b45309', fontWeight: 800 }}>
+          Qabul qilindi: {day.acceptedOrders}
+          </div>
+          <div style={{ padding: 14, borderRadius: 16, background: '#ede9fe', color: '#6d28d9', fontWeight: 800 }}>
+          Tayyor: {day.readyOrders}
+          </div>
+          <div style={{ padding: 14, borderRadius: 16, background: '#d1fae5', color: '#047857', fontWeight: 800 }}>
+          Yetkazildi: {day.deliveredOrders}
+          </div>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: statsGrid3, gap: 12, marginTop: 12 }}>
+          <div style={{ padding: 14, borderRadius: 16, background: '#ecfdf5', color: '#047857', fontWeight: 800 }}>
+          To‘langan: {day.paidOrders}
+          </div>
+          <div style={{ padding: 14, borderRadius: 16, background: '#fffbeb', color: '#b45309', fontWeight: 800 }}>
+          Kutilmoqda: {day.pendingPaymentOrders}
+          </div>
+          <div style={{ padding: 14, borderRadius: 16, background: '#f8fafc', color: '#0f172a', fontWeight: 800 }}>
+          Yetkazilgan daromad: {formatPrice(day.deliveredRevenue)}
+          </div>
+          </div>
+          </div>
+        ))}
+        </div>
+      )}
+      </Card>
+      </div>
+    )}
+    </div>
     </div>
     
-    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-    <Button
-    onClick={() => setShowForm(false)}
-    style={{ background: '#e2e8f0', color: '#0f172a' }}
-    >
-    Bekor qilish
-    </Button>
-    <Button onClick={saveProduct}>Saqlash</Button>
+    {showForm && (
+      <div
+      onClick={() => setShowForm(false)}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(15,23,42,0.4)',
+        display: 'grid',
+        placeItems: 'center',
+        padding: isMobile ? 12 : 20,
+        zIndex: 999,
+      }}
+      >
+      <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        width: '100%',
+        maxWidth: 560,
+        maxHeight: '90vh',
+        overflowY: 'auto',
+        background: '#ffffff',
+        borderRadius: 28,
+        padding: isMobile ? 18 : 24,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+      }}
+      >
+      <div style={{ fontSize: isMobile ? 22 : 26, fontWeight: 800, marginBottom: 18, color: '#0f172a' }}>
+      {editingId ? 'Mahsulotni tahrirlash' : 'Yangi mahsulot qo‘shish'}
+      </div>
+      
+      <div style={{ display: 'grid', gap: 14 }}>
+      <Input
+      placeholder="ID / key"
+      value={form.id}
+      onChange={(e) => setForm((prev) => ({ ...prev, id: e.target.value }))}
+      />
+      
+      <Input
+      placeholder="Mahsulot nomi"
+      value={form.name}
+      onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+      />
+      
+      <Input
+      placeholder="Narxi"
+      type="number"
+      value={form.price}
+      onChange={(e) => setForm((prev) => ({ ...prev, price: e.target.value }))}
+      />
+      
+      <Input
+      placeholder="Kategoriya"
+      value={form.category}
+      onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
+      />
+      
+      <div style={{ display: 'flex', gap: 10, flexDirection: isSmallMobile ? 'column' : 'row' }}>
+      <Button
+      onClick={() => setImageMode('url')}
+      style={{
+        flex: 1,
+        background: imageMode === 'url' ? '#0f172a' : '#e2e8f0',
+        color: imageMode === 'url' ? '#ffffff' : '#0f172a',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+      }}
+      >
+      <LinkIcon size={16} />
+      URL bilan
+      </Button>
+      
+      <Button
+      onClick={() => setImageMode('upload')}
+      style={{
+        flex: 1,
+        background: imageMode === 'upload' ? '#0f172a' : '#e2e8f0',
+        color: imageMode === 'upload' ? '#ffffff' : '#0f172a',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+      }}
+      >
+      <Upload size={16} />
+      Upload
+      </Button>
+      </div>
+      
+      {imageMode === 'url' ? (
+        <Input
+        placeholder="Rasm URL"
+        value={form.image}
+        onChange={(e) => setForm((prev) => ({ ...prev, image: e.target.value }))}
+        />
+      ) : (
+        <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => handleImageFileChange(e.target.files?.[0])}
+        style={{
+          width: '100%',
+          padding: '12px 14px',
+          borderRadius: 14,
+          border: '1px solid #dbe2ea',
+          outline: 'none',
+          fontSize: 14,
+          background: '#ffffff',
+        }}
+        />
+      )}
+      
+      {form.image ? (
+        <div
+        style={{
+          border: '1px solid #e2e8f0',
+          borderRadius: 18,
+          padding: 12,
+          background: '#f8fafc',
+        }}
+        >
+        <div style={{ fontSize: 13, color: '#64748b', marginBottom: 10 }}>Rasm preview</div>
+        <img
+        src={form.image}
+        alt="preview"
+        style={{
+          width: '100%',
+          maxHeight: 220,
+          objectFit: 'contain',
+          borderRadius: 14,
+          background: '#ffffff',
+        }}
+        />
+        </div>
+      ) : null}
+      </div>
+      
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, flexDirection: isSmallMobile ? 'column' : 'row' }}>
+      <Button
+      onClick={() => setShowForm(false)}
+      style={{ background: '#e2e8f0', color: '#0f172a', width: isSmallMobile ? '100%' : 'auto' }}
+      >
+      Bekor qilish
+      </Button>
+      <Button onClick={saveProduct} style={{ width: isSmallMobile ? '100%' : 'auto' }}>
+      <Check size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+      Saqlash
+      </Button>
+      </div>
+      </div>
+      </div>
+    )}
     </div>
-    </div>
-    </div>
-  )}
-  </div>
-);
+  );
 }
