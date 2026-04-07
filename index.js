@@ -136,14 +136,14 @@ function isRestaurantOpen() {
 }
 
 function getWorkHoursText() {
-    return `🕒 Ish vaqti: ${WORK_START} - ${WORK_END}`;
+    return `${WORK_START} - ${WORK_END}`;
 }
 
 function getClosedText() {
     return [
-        '⛔ Hozir buyurtma qabul qilinmaydi.',
-        getWorkHoursText(),
-        `🕐 Hozirgi vaqt: ${getCurrentTimeText()}`
+        'Hozir buyurtma qabul qilinmaydi.',
+        `Ish vaqti: ${getWorkHoursText()}`,
+        `Hozirgi vaqt: ${getCurrentTimeText()}`
     ].join('\n');
 }
 
@@ -158,9 +158,7 @@ function getCartItems(cart) {
     for (const key in cart) {
         const item = menu[key];
         const qty = cart[key];
-        
         if (!item || !item.active || qty <= 0) continue;
-        
         items.push({
             key,
             name: item.name,
@@ -179,10 +177,9 @@ function getCartTotal(cart) {
 
 function getCartText(cart) {
     const items = getCartItems(cart);
+    if (!items.length) return "Savat bo'sh.";
     
-    if (!items.length) return '🛒 Savat bo‘sh.';
-    
-    let text = '🛒 Savat:\n\n';
+    let text = 'Savat:\n\n';
     for (const item of items) {
         text += `${item.name} x ${item.qty} = ${formatPrice(item.total)}\n`;
     }
@@ -194,12 +191,12 @@ function getCartButtons(cart) {
     if (total === 0) return undefined;
     
     const rows = [
-        [Markup.button.callback('✅ Buyurtma berish', 'checkout')],
-        [Markup.button.callback('🗑 Savatni tozalash', 'clear_cart')]
+        [Markup.button.callback('Buyurtma berish', 'checkout')],
+        [Markup.button.callback('Savatni tozalash', 'clear_cart')]
     ];
     
     if (getCategories({ activeOnly: true }).length) {
-        rows.push([Markup.button.callback('⬅️ Kategoriyalarga qaytish', 'back_to_categories')]);
+        rows.push([Markup.button.callback('Kategoriyalarga qaytish', 'back_to_categories')]);
     }
     
     return Markup.inlineKeyboard(rows);
@@ -209,40 +206,18 @@ function generateOrderId() {
     return Date.now().toString().slice(-6);
 }
 
-function getButtonsByStatus(order) {
-    if (order.status === 'Yangi buyurtma') {
-        return Markup.inlineKeyboard([
-            [Markup.button.callback('✅ Qabul qilindi', `status_${order.id}_Qabul qilindi`)]
-        ]);
-    }
-    
-    if (order.status === 'Qabul qilindi') {
-        return Markup.inlineKeyboard([
-            [Markup.button.callback('👨‍🍳 Tayyor', `status_${order.id}_Tayyor`)]
-        ]);
-    }
-    
-    if (order.status === 'Tayyor') {
-        return Markup.inlineKeyboard([
-            [Markup.button.callback('🚚 Yetkazildi', `status_${order.id}_Yetkazildi`)]
-        ]);
-    }
-    
-    return undefined;
-}
-
 function getDeliveryTypeText(deliveryType) {
-    return deliveryType === 'pickup' ? '📦 O‘zi olib ketadi' : '🚚 Yetkazib berish';
+    return deliveryType === 'pickup' ? "O'zi olib ketadi" : 'Yetkazib berish';
 }
 
 function getPaymentMethodText(paymentMethod) {
-    return paymentMethod === 'click' ? '💳 Click' : '💵 Naqd';
+    return paymentMethod === 'click' ? 'Click' : 'Naqd';
 }
 
 function getPaymentStatusText(paymentStatus) {
-    if (paymentStatus === 'paid') return '✅ To‘langan';
-    if (paymentStatus === 'failed') return '❌ To‘lov muvaffaqiyatsiz';
-    return '⏳ To‘lov kutilmoqda';
+    if (paymentStatus === 'paid') return "To'langan";
+    if (paymentStatus === 'failed') return "To'lov amalga oshmadi";
+    return "To'lov kutilmoqda";
 }
 
 function clearPaymentTimer(orderId) {
@@ -253,35 +228,84 @@ function clearPaymentTimer(orderId) {
     }
 }
 
+// =============================================
+// ADMIN GURUHDA TO'LOV TUGMALARI
+// Click pending bo'lsa — "To'landi" va "Bekor qilish" tugmalari
+// =============================================
+function getAdminPaymentButtons(order) {
+    if (order.paymentMethod !== 'click') return null;
+    if (order.paymentStatus === 'paid') return null;
+    if (order.status === 'Bekor qilindi' || order.status === 'Yetkazildi') return null;
+    
+    return [
+        [
+            Markup.button.callback("To'landi (Click)", `pay_confirm_${order.id}`),
+            Markup.button.callback("Bekor qilish", `pay_cancel_${order.id}`)
+        ]
+    ];
+}
+
+function getButtonsByStatus(order) {
+    const paymentRows = getAdminPaymentButtons(order);
+    
+    if (order.status === 'Yangi buyurtma') {
+        const rows = [[Markup.button.callback('Qabul qilindi', `status_${order.id}_Qabul qilindi`)]];
+        if (paymentRows) rows.push(...paymentRows);
+        return Markup.inlineKeyboard(rows);
+    }
+    
+    if (order.status === 'Qabul qilindi') {
+        const rows = [[Markup.button.callback('Tayyor', `status_${order.id}_Tayyor`)]];
+        if (paymentRows) rows.push(...paymentRows);
+        return Markup.inlineKeyboard(rows);
+    }
+    
+    if (order.status === 'Tayyor') {
+        const rows = [[Markup.button.callback('Yetkazildi', `status_${order.id}_Yetkazildi`)]];
+        if (paymentRows) rows.push(...paymentRows);
+        return Markup.inlineKeyboard(rows);
+    }
+    
+    if (paymentRows) {
+        return Markup.inlineKeyboard(paymentRows);
+    }
+    
+    return undefined;
+}
+
 function buildAdminText(order) {
     const locationLine = order.location?.text
-    ? `📍 Manzil: ${order.location.text}`
+    ? `Manzil: ${order.location.text}`
     : (order.location?.lat && order.location?.lon
-        ? `📍 Lokatsiya: https://maps.google.com/?q=${order.location.lat},${order.location.lon}`
-        : '📍 Manzil: yo‘q');
+        ? `Lokatsiya: https://maps.google.com/?q=${order.location.lat},${order.location.lon}`
+        : "Manzil: yo'q");
+        
+        const header = order.status === 'Bekor qilindi'
+        ? 'Buyurtma bekor qilindi!'
+        : 'Yangi buyurtma!';
         
         return [
-            '🆕 Yangi buyurtma!',
+            header,
             '',
-            `🆔 Buyurtma ID: ${order.id}`,
-            `📌 Status: ${order.status}`,
-            `🚚 Yetkazish turi: ${getDeliveryTypeText(order.deliveryType)}`,
-            `💳 To‘lov turi: ${getPaymentMethodText(order.paymentMethod)}`,
-            `💰 To‘lov holati: ${getPaymentStatusText(order.paymentStatus)}`,
-            `👤 Ism: ${order.name}`,
-            `📞 Telefon: ${order.phone}`,
-            `👤 Telegram: ${order.telegramName}`,
-            `🔗 Username: ${order.username ? '@' + order.username : 'yo‘q'}`,
-            `🆔 User ID: ${order.userId}`,
-            `💬 Chat ID: ${order.chatId}`,
+            `Buyurtma ID: ${order.id}`,
+            `Status: ${order.status}`,
+            `Yetkazish turi: ${getDeliveryTypeText(order.deliveryType)}`,
+            `To'lov turi: ${getPaymentMethodText(order.paymentMethod)}`,
+            `To'lov holati: ${getPaymentStatusText(order.paymentStatus)}`,
+            `Ism: ${order.name}`,
+            `Telefon: ${order.phone}`,
+            `Telegram: ${order.telegramName}`,
+            `Username: ${order.username ? '@' + order.username : "yo'q"}`,
+            `User ID: ${order.userId}`,
+            `Chat ID: ${order.chatId}`,
             locationLine,
             '',
             order.cartText,
-            `💰 Jami: ${formatPrice(order.total)}`,
-            ...(order.clickTransactionId ? [`🧾 Click transaction: ${order.clickTransactionId}`] : []),
-            ...(order.paidAt ? [`🕒 To‘langan vaqt: ${new Date(order.paidAt).toLocaleString('uz-UZ', { timeZone: TIME_ZONE })}`] : []),
+            `Jami: ${formatPrice(order.total)}`,
+            ...(order.clickTransactionId ? [`Click transaction: ${order.clickTransactionId}`] : []),
+            ...(order.paidAt ? [`To'langan vaqt: ${new Date(order.paidAt).toLocaleString('uz-UZ', { timeZone: TIME_ZONE })}`] : []),
             '',
-            `🕒 Buyurtma vaqti: ${new Date(order.createdAt).toLocaleString('uz-UZ', { timeZone: TIME_ZONE })}`
+            `Buyurtma vaqti: ${new Date(order.createdAt).toLocaleString('uz-UZ', { timeZone: TIME_ZONE })}`
         ].join('\n');
     }
     
@@ -297,9 +321,7 @@ function buildAdminText(order) {
                     order.adminMessageId,
                     undefined,
                     buildAdminText(order),
-                    {
-                        reply_markup: nextButtons.reply_markup
-                    }
+                    { reply_markup: nextButtons.reply_markup }
                 );
             } else {
                 await bot.telegram.editMessageText(
@@ -354,20 +376,20 @@ function buildAdminText(order) {
             Markup.button.callback(category, `cat_${encodeURIComponent(category)}`)
         ]);
         
-        rows.push([Markup.button.callback('🛒 Savatni ko‘rish', 'open_cart')]);
+        rows.push([Markup.button.callback("Savatni ko'rish", 'open_cart')]);
         return Markup.inlineKeyboard(rows);
     }
     
     function getCategoryText() {
         const categories = getCategories({ activeOnly: true });
-        if (!categories.length) return '📭 Hozircha aktiv mahsulot yo‘q.';
+        if (!categories.length) return "Hozircha aktiv mahsulot yo'q.";
         
         return [
-            '📂 Kategoriyani tanlang:',
+            'Kategoriyani tanlang:',
             '',
             ...categories.map((category, index) => `${index + 1}. ${category}`),
             '',
-            getWorkHoursText()
+            `Ish vaqti: ${getWorkHoursText()}`
         ].join('\n');
     }
     
@@ -375,14 +397,14 @@ function buildAdminText(order) {
         const items = getItemsByCategory(category, { activeOnly: true });
         const total = getCartTotal(cart);
         
-        if (!items.length) return `📭 ${category} kategoriyasida mahsulot yo‘q.`;
+        if (!items.length) return `${category} kategoriyasida mahsulot yo'q.`;
         
         return [
-            `📂 Kategoriya: ${category}`,
+            `Kategoriya: ${category}`,
             '',
-            ...items.map((item) => `${item.name} — ${formatPrice(item.price)}`),
+            ...items.map((item) => `${item.name} - ${formatPrice(item.price)}`),
             '',
-            `🛒 Savatdagi jami: ${formatPrice(total)}`
+            `Savatdagi jami: ${formatPrice(total)}`
         ].join('\n');
     }
     
@@ -392,18 +414,18 @@ function buildAdminText(order) {
         
         for (const item of items) {
             rows.push([
-                Markup.button.callback(`🖼 ${item.name} — ${formatPrice(item.price)}`, `view_${item.key}`)
+                Markup.button.callback(`${item.name} - ${formatPrice(item.price)}`, `view_${item.key}`)
             ]);
             
             rows.push([
-                Markup.button.callback('➖', `minus_${item.key}`),
+                Markup.button.callback('-', `minus_${item.key}`),
                 Markup.button.callback(`${item.name} (${getQty(cart, item.key)})`, 'ignore'),
-                Markup.button.callback('➕', `add_${item.key}`)
+                Markup.button.callback('+', `add_${item.key}`)
             ]);
         }
         
-        rows.push([Markup.button.callback('⬅️ Kategoriyalarga qaytish', 'back_to_categories')]);
-        rows.push([Markup.button.callback('🛒 Savatni ko‘rish', 'open_cart')]);
+        rows.push([Markup.button.callback('Kategoriyalarga qaytish', 'back_to_categories')]);
+        rows.push([Markup.button.callback("Savatni ko'rish", 'open_cart')]);
         
         return Markup.inlineKeyboard(rows);
     }
@@ -435,7 +457,7 @@ function buildAdminText(order) {
             description: [
                 `Buyurtma ID: ${order.id}`,
                 `Yetkazish turi: ${getDeliveryTypeText(order.deliveryType)}`,
-                `To‘lov turi: Click`
+                "To'lov turi: Click"
             ].join('\n'),
             payload: `order_${order.id}`,
             provider_token: CLICK_PROVIDER_TOKEN,
@@ -455,42 +477,42 @@ function buildAdminText(order) {
         });
     }
     
+    // =============================================
+    // 10 DAQIQA TO'LOV AMALGA OSHMASA — BEKOR QILISH
+    // =============================================
     async function cancelExpiredClickOrder(orderId) {
         try {
             const order = getOrderById(orderId);
             
-            if (!order) {
-                clearPaymentTimer(orderId);
-                return;
-            }
-            
-            if (order.paymentMethod !== 'click') {
-                clearPaymentTimer(orderId);
-                return;
-            }
-            
-            if (order.paymentStatus === 'paid') {
-                clearPaymentTimer(orderId);
-                return;
-            }
-            
+            if (!order) { clearPaymentTimer(orderId); return; }
+            if (order.paymentMethod !== 'click') { clearPaymentTimer(orderId); return; }
+            if (order.paymentStatus === 'paid') { clearPaymentTimer(orderId); return; }
             if (order.status === 'Bekor qilindi' || order.status === 'Yetkazildi') {
                 clearPaymentTimer(orderId);
                 return;
             }
             
-            const updatedOrder = await updateOrderStatus(orderId, 'Bekor qilindi');
+            // Avval statusni bekor qilish
+            await updateOrderStatus(orderId, 'Bekor qilindi');
+            
+            // Keyin to'lov holatini ham failed ga o'zgartirish
+            const updatedOrder = await updateOrderPayment(orderId, {
+                paymentStatus: 'failed',
+                paidAt: null
+            });
+            
             sendSseEvent('order_updated', updatedOrder);
             await syncAdminOrderMessage(updatedOrder);
             
+            // Mijozga xabar yuborish
             try {
                 await bot.telegram.sendMessage(
                     updatedOrder.chatId,
                     [
-                        '❌ Buyurtma bekor qilindi.',
+                        'Buyurtma bekor qilindi.',
                         '',
-                        `🆔 Buyurtma ID: ${updatedOrder.id}`,
-                        '⏰ Sabab: 10 daqiqa ichida Click to‘lovi amalga oshirilmadi.'
+                        `Buyurtma ID: ${updatedOrder.id}`,
+                        "Sabab: 10 daqiqa ichida Click to'lovi amalga oshirilmadi."
                     ].join('\n'),
                     mainKeyboard
                 );
@@ -522,12 +544,11 @@ function buildAdminText(order) {
             ctx.session.step = null;
             ctx.session.orderData = {};
             ctx.session.currentCategory = null;
-            return ctx.reply('🛒 Savat bo‘sh bo‘lib qoldi.', mainKeyboard);
+            return ctx.reply("Savat bo'sh bo'lib qoldi.", mainKeyboard);
         }
         
         const cartText = getCartText(ctx.session.cart);
         const orderId = generateOrderId();
-        
         const selectedPaymentMethod = ctx.session.orderData.paymentMethod || 'cash';
         
         const order = {
@@ -540,7 +561,7 @@ function buildAdminText(order) {
             paymentStatus: 'pending',
             paidAt: null,
             clickTransactionId: null,
-            telegramName: [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || 'Noma’lum',
+            telegramName: [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || "Noma'lum",
             userId: ctx.from.id,
             chatId: ctx.chat.id,
             location: locationData,
@@ -558,22 +579,22 @@ function buildAdminText(order) {
         sendSseEvent('order_created', order);
         
         const userText = [
-            '✅ Buyurtma yaratildi!',
+            'Buyurtma yaratildi!',
             '',
-            `🆔 Buyurtma ID: ${order.id}`,
-            `🚚 Yetkazish turi: ${getDeliveryTypeText(order.deliveryType)}`,
-            `💳 To‘lov turi: ${getPaymentMethodText(order.paymentMethod)}`,
-            `💰 To‘lov holati: ${getPaymentStatusText(order.paymentStatus)}`,
-            `👤 Ism: ${order.name}`,
-            `📞 Telefon: ${order.phone}`,
+            `Buyurtma ID: ${order.id}`,
+            `Yetkazish turi: ${getDeliveryTypeText(order.deliveryType)}`,
+            `To'lov turi: ${getPaymentMethodText(order.paymentMethod)}`,
+            `To'lov holati: ${getPaymentStatusText(order.paymentStatus)}`,
+            `Ism: ${order.name}`,
+            `Telefon: ${order.phone}`,
             locationNoticeText,
             '',
             order.cartText,
-            `💰 Jami: ${formatPrice(order.total)}`,
+            `Jami: ${formatPrice(order.total)}`,
             '',
-            `📌 Holat: ${order.status}`,
+            `Holat: ${order.status}`,
             ...(order.paymentMethod === 'click'
-                ? ['', '⏳ Click to‘lovi uchun 10 daqiqa vaqt beriladi.', 'Agar vaqtida to‘lov qilinmasa buyurtma avtomatik bekor bo‘ladi.']
+                ? ['', "Click to'lovi uchun 10 daqiqa vaqt beriladi.", "Agar vaqtida to'lov qilinmasa buyurtma avtomatik bekor bo'ladi."]
                 : [])
             ].join('\n');
             
@@ -623,12 +644,16 @@ function buildAdminText(order) {
                     scheduleClickPaymentTimeout(order.id);
                 } catch (error) {
                     console.log('Click invoice yuborishda xato:', error.message);
-                    await ctx.reply("❌ Click invoice yuborilmadi. Tokenni yoki BotFather ulanishini tekshiring.");
+                    await ctx.reply("Click invoice yuborilmadi. Tokenni yoki BotFather ulanishini tekshiring.");
                 }
             }
             
             return;
         }
+        
+        // =============================================
+        // BOT EVENTS
+        // =============================================
         
         bot.on('pre_checkout_query', async (ctx) => {
             try {
@@ -645,14 +670,14 @@ function buildAdminText(order) {
                 const providerChargeId = ctx.message.successful_payment?.provider_payment_charge_id || null;
                 
                 if (!payload.startsWith('order_')) {
-                    return ctx.reply('To‘lov qabul qilindi.');
+                    return ctx.reply("To'lov qabul qilindi.");
                 }
                 
                 const orderId = payload.replace('order_', '');
                 const order = getOrderById(orderId);
                 
                 if (!order) {
-                    return ctx.reply('To‘lov qabul qilindi, lekin buyurtma topilmadi.');
+                    return ctx.reply("To'lov qabul qilindi, lekin buyurtma topilmadi.");
                 }
                 
                 clearPaymentTimer(orderId);
@@ -669,16 +694,136 @@ function buildAdminText(order) {
                 
                 await ctx.reply(
                     [
-                        '✅ Click to‘lovi muvaffaqiyatli qabul qilindi!',
+                        "Click to'lovi muvaffaqiyatli qabul qilindi!",
                         '',
-                        `🆔 Buyurtma ID: ${updated.id}`,
-                        `💳 To‘lov turi: ${getPaymentMethodText(updated.paymentMethod)}`,
-                        `💰 To‘lov holati: ${getPaymentStatusText(updated.paymentStatus)}`
+                        `Buyurtma ID: ${updated.id}`,
+                        `To'lov turi: ${getPaymentMethodText(updated.paymentMethod)}`,
+                        `To'lov holati: ${getPaymentStatusText(updated.paymentStatus)}`
                     ].join('\n'),
                     mainKeyboard
                 );
             } catch (error) {
                 console.log('Successful payment xato:', error.message);
+            }
+        });
+        
+        // =============================================
+        // ADMIN: "To'landi (Click)" tugmasi bosilganda
+        // =============================================
+        bot.action(/^pay_confirm_(\w+)$/, async (ctx) => {
+            if (!isAdminChat(ctx)) {
+                await ctx.answerCbQuery("Ruxsat yo'q");
+                return;
+            }
+            
+            const orderId = ctx.match[1];
+            const order = getOrderById(orderId);
+            
+            if (!order) {
+                await ctx.answerCbQuery('Buyurtma topilmadi');
+                return;
+            }
+            
+            if (order.paymentStatus === 'paid') {
+                await ctx.answerCbQuery("Allaqachon to'langan");
+                return;
+            }
+            
+            clearPaymentTimer(orderId);
+            
+            const updated = await updateOrderPayment(orderId, {
+                paymentMethod: 'click',
+                paymentStatus: 'paid',
+                paidAt: new Date().toISOString(),
+                clickTransactionId: null
+            });
+            
+            sendSseEvent('order_updated', updated);
+            
+            try {
+                const nextButtons = getButtonsByStatus(updated);
+                if (nextButtons) {
+                    await ctx.editMessageText(buildAdminText(updated), { reply_markup: nextButtons.reply_markup });
+                } else {
+                    await ctx.editMessageText(buildAdminText(updated));
+                }
+            } catch (error) {
+                console.log('Admin xabarini yangilashda xato:', error.message);
+            }
+            
+            await ctx.answerCbQuery("To'lov tasdiqlandi");
+            
+            try {
+                await bot.telegram.sendMessage(
+                    updated.chatId,
+                    [
+                        "To'lovingiz tasdiqlandi!",
+                        '',
+                        `Buyurtma ID: ${updated.id}`,
+                        `To'lov turi: ${getPaymentMethodText(updated.paymentMethod)}`,
+                        `To'lov holati: ${getPaymentStatusText(updated.paymentStatus)}`
+                    ].join('\n'),
+                    mainKeyboard
+                );
+            } catch (error) {
+                console.log("Mijozga to'lov xabari yuborishda xato:", error.message);
+            }
+        });
+        
+        // =============================================
+        // ADMIN: "Bekor qilish" tugmasi bosilganda
+        // =============================================
+        bot.action(/^pay_cancel_(\w+)$/, async (ctx) => {
+            if (!isAdminChat(ctx)) {
+                await ctx.answerCbQuery("Ruxsat yo'q");
+                return;
+            }
+            
+            const orderId = ctx.match[1];
+            const order = getOrderById(orderId);
+            
+            if (!order) {
+                await ctx.answerCbQuery('Buyurtma topilmadi');
+                return;
+            }
+            
+            if (order.status === 'Bekor qilindi') {
+                await ctx.answerCbQuery('Allaqachon bekor qilingan');
+                return;
+            }
+            
+            clearPaymentTimer(orderId);
+            
+            // Status va to'lov holatini birga o'zgartirish
+            await updateOrderStatus(orderId, 'Bekor qilindi');
+            const updated = await updateOrderPayment(orderId, {
+                paymentStatus: 'failed',
+                paidAt: null
+            });
+            
+            sendSseEvent('order_updated', updated);
+            
+            try {
+                await ctx.editMessageText(buildAdminText(updated));
+            } catch (error) {
+                console.log('Admin xabarini yangilashda xato:', error.message);
+            }
+            
+            await ctx.answerCbQuery('Buyurtma bekor qilindi');
+            
+            try {
+                await bot.telegram.sendMessage(
+                    updated.chatId,
+                    [
+                        'Buyurtmangiz bekor qilindi.',
+                        '',
+                        `Buyurtma ID: ${updated.id}`,
+                        "Muammo bo'lsa admin bilan bog'laning."
+                    ].join('\n'),
+                    mainKeyboard
+                );
+            } catch (error) {
+                console.log('Mijozga bekor xabari yuborishda xato:', error.message);
             }
         });
         
@@ -701,6 +846,10 @@ function buildAdminText(order) {
             }
         }
         
+        // =============================================
+        // BOT COMMANDS
+        // =============================================
+        
         bot.start((ctx) => {
             clearUnavailableCartItems(ctx.session.cart);
             ctx.session.step = null;
@@ -721,16 +870,16 @@ function buildAdminText(order) {
             const parsed = parseAddOrEditCommand(ctx.message.text, '/add');
             if (!parsed) {
                 return ctx.reply(
-                    'Format noto‘g‘ri.\n\n/add key|Nomi|Narx|Kategoriya|ImageURL\n\nMasalan:\n/add hotdog|Hot Dog|18000|Fast Food|https://site.com/hotdog.jpg\n\nAgar rasm bo‘lmasa oxiriga - yoz:\n/add hotdog|Hot Dog|18000|Fast Food|-'
+                    "Format: /add key|Nomi|Narx|Kategoriya|ImageURL\n\nMasalan:\n/add hotdog|Hot Dog|18000|Fast Food|https://site.com/img.jpg\n\nRasm bo'lmasa: -"
                 );
             }
             
             try {
                 await addMenuItem(parsed.key, parsed.name, parsed.price, parsed.category, parsed.image);
                 sendSseEvent('menu_updated');
-                return ctx.reply(`✅ Qo‘shildi:\n${parsed.name} — ${formatPrice(parsed.price)}\ncategory: ${parsed.category}\nkey: ${parsed.key}`);
+                return ctx.reply(`Qo'shildi: ${parsed.name} - ${formatPrice(parsed.price)}\nKategoriya: ${parsed.category}\nKey: ${parsed.key}`);
             } catch (error) {
-                return ctx.reply(`❌ ${error.message}`);
+                return ctx.reply(`Xato: ${error.message}`);
             }
         });
         
@@ -740,16 +889,16 @@ function buildAdminText(order) {
             const parsed = parseAddOrEditCommand(ctx.message.text, '/edit');
             if (!parsed) {
                 return ctx.reply(
-                    'Format noto‘g‘ri.\n\n/edit key|Yangi Nomi|Yangi Narx|Kategoriya|ImageURL\n\nMasalan:\n/edit hotdog|Hot Dog Big|22000|Fast Food|https://site.com/hotdog2.jpg'
+                    "Format: /edit key|Yangi Nomi|Yangi Narx|Kategoriya|ImageURL"
                 );
             }
             
             try {
                 await editMenuItem(parsed.key, parsed.name, parsed.price, parsed.category, parsed.image);
                 sendSseEvent('menu_updated');
-                return ctx.reply(`✅ Yangilandi:\n${parsed.name} — ${formatPrice(parsed.price)}\ncategory: ${parsed.category}\nkey: ${parsed.key}`);
+                return ctx.reply(`Yangilandi: ${parsed.name} - ${formatPrice(parsed.price)}\nKey: ${parsed.key}`);
             } catch (error) {
-                return ctx.reply(`❌ ${error.message}`);
+                return ctx.reply(`Xato: ${error.message}`);
             }
         });
         
@@ -759,14 +908,14 @@ function buildAdminText(order) {
             const rawKey = ctx.message.text.replace('/delete', '').trim();
             const key = normalizeKey(rawKey);
             
-            if (!key) return ctx.reply('Format: /delete key\n\nMasalan:\n/delete hotdog');
+            if (!key) return ctx.reply('Format: /delete key');
             
             try {
                 const deleted = await deleteMenuItem(key);
                 sendSseEvent('menu_updated');
-                return ctx.reply(`🗑 O‘chirildi:\n${deleted.name}\nkey: ${deleted.key}`);
+                return ctx.reply(`O'chirildi: ${deleted.name} (${deleted.key})`);
             } catch (error) {
-                return ctx.reply(`❌ ${error.message}`);
+                return ctx.reply(`Xato: ${error.message}`);
             }
         });
         
@@ -776,14 +925,14 @@ function buildAdminText(order) {
             const rawKey = ctx.message.text.replace('/hide', '').trim();
             const key = normalizeKey(rawKey);
             
-            if (!key) return ctx.reply('Format: /hide key\n\nMasalan:\n/hide cola');
+            if (!key) return ctx.reply('Format: /hide key');
             
             try {
                 const item = await setMenuItemActive(key, false);
                 sendSseEvent('menu_updated');
-                return ctx.reply(`🙈 Yashirildi:\n${item.name}\nkey: ${item.key}`);
+                return ctx.reply(`Yashirildi: ${item.name} (${item.key})`);
             } catch (error) {
-                return ctx.reply(`❌ ${error.message}`);
+                return ctx.reply(`Xato: ${error.message}`);
             }
         });
         
@@ -793,14 +942,14 @@ function buildAdminText(order) {
             const rawKey = ctx.message.text.replace('/show', '').trim();
             const key = normalizeKey(rawKey);
             
-            if (!key) return ctx.reply('Format: /show key\n\nMasalan:\n/show cola');
+            if (!key) return ctx.reply('Format: /show key');
             
             try {
                 const item = await setMenuItemActive(key, true);
                 sendSseEvent('menu_updated');
-                return ctx.reply(`👀 Qayta ochildi:\n${item.name}\nkey: ${item.key}`);
+                return ctx.reply(`Ochildi: ${item.name} (${item.key})`);
             } catch (error) {
-                return ctx.reply(`❌ ${error.message}`);
+                return ctx.reply(`Xato: ${error.message}`);
             }
         });
         
@@ -811,26 +960,31 @@ function buildAdminText(order) {
             const allOrders = getAllOrders();
             
             return ctx.reply([
-                '📊 Bugungi statistika:',
+                'Bugungi statistika:',
                 '',
-                `📅 Sana: ${stats.date}`,
-                `🧾 Bugungi buyurtmalar: ${stats.totalOrders}`,
-                `🆕 Yangi: ${stats.newOrders}`,
-                `✅ Qabul qilingan: ${stats.acceptedOrders}`,
-                `👨‍🍳 Tayyor: ${stats.readyOrders}`,
-                `🚚 Yetkazilgan: ${stats.deliveredOrders}`,
-                `💰 Bugungi jami summa: ${formatPrice(stats.totalRevenue)}`,
-                `💵 Naqd tushum: ${formatPrice(stats.cashRevenue)}`,
-                `💳 Click tushum: ${formatPrice(stats.clickRevenue)}`,
-                `✅ To‘langan buyurtmalar: ${stats.paidOrders}`,
-                `⏳ To‘lov kutilayotganlar: ${stats.pendingPaymentOrders}`,
+                `Sana: ${stats.date}`,
+                `Bugungi buyurtmalar: ${stats.totalOrders}`,
+                `Yangi: ${stats.newOrders}`,
+                `Qabul qilingan: ${stats.acceptedOrders}`,
+                `Tayyor: ${stats.readyOrders}`,
+                `Yetkazilgan: ${stats.deliveredOrders}`,
+                `Bekor qilingan: ${stats.cancelledOrders || 0}`,
+                `Bugungi jami summa: ${formatPrice(stats.totalRevenue)}`,
+                `Naqd tushum: ${formatPrice(stats.cashRevenue)}`,
+                `Click tushum: ${formatPrice(stats.clickRevenue)}`,
+                `To'langan buyurtmalar: ${stats.paidOrders}`,
+                `To'lov kutilayotganlar: ${stats.pendingPaymentOrders}`,
                 '',
-                `📦 Umumiy buyurtmalar soni: ${allOrders.length}`,
+                `Umumiy buyurtmalar: ${allOrders.length}`,
                 '',
-                getWorkHoursText(),
-                `🕐 Hozirgi vaqt: ${getCurrentTimeText()}`
+                `Ish vaqti: ${getWorkHoursText()}`,
+                `Hozirgi vaqt: ${getCurrentTimeText()}`
             ].join('\n'));
         });
+        
+        // =============================================
+        // BOT ACTIONS
+        // =============================================
         
         bot.hears('🍽 Menyu', async (ctx) => {
             clearUnavailableCartItems(ctx.session.cart);
@@ -866,9 +1020,9 @@ function buildAdminText(order) {
             await ctx.answerCbQuery();
             
             const caption = [
-                `🍽 ${item.name}`,
-                `📂 Kategoriya: ${item.category}`,
-                `💰 Narx: ${formatPrice(item.price)}`
+                item.name,
+                `Kategoriya: ${item.category}`,
+                `Narx: ${formatPrice(item.price)}`
             ].join('\n');
             
             if (item.image) {
@@ -892,7 +1046,7 @@ function buildAdminText(order) {
             }
             
             ctx.session.cart[key] = (ctx.session.cart[key] || 0) + 1;
-            await ctx.answerCbQuery(`${item.name} qo‘shildi`);
+            await ctx.answerCbQuery(`${item.name} qo'shildi`);
             
             if (ctx.session.currentCategory) {
                 return renderCategoryProducts(ctx, ctx.session.currentCategory, true);
@@ -931,7 +1085,7 @@ function buildAdminText(order) {
             
             if (total === 0) return ctx.reply(text);
             
-            return ctx.reply(`${text}\n💰 Jami: ${formatPrice(total)}`, getCartButtons(ctx.session.cart));
+            return ctx.reply(`${text}\nJami: ${formatPrice(total)}`, getCartButtons(ctx.session.cart));
         });
         
         bot.action('open_cart', async (ctx) => {
@@ -943,13 +1097,13 @@ function buildAdminText(order) {
             
             if (total === 0) return ctx.reply(text);
             
-            return ctx.reply(`${text}\n💰 Jami: ${formatPrice(total)}`, getCartButtons(ctx.session.cart));
+            return ctx.reply(`${text}\nJami: ${formatPrice(total)}`, getCartButtons(ctx.session.cart));
         });
         
         bot.action('clear_cart', async (ctx) => {
             ctx.session.cart = {};
             await ctx.answerCbQuery('Savat tozalandi');
-            return ctx.reply('🗑 Savat tozalandi.', mainKeyboard);
+            return ctx.reply('Savat tozalandi.', mainKeyboard);
         });
         
         bot.action('checkout', async (ctx) => {
@@ -958,7 +1112,7 @@ function buildAdminText(order) {
             const total = getCartTotal(ctx.session.cart);
             
             if (total === 0) {
-                await ctx.answerCbQuery('Savat bo‘sh');
+                await ctx.answerCbQuery("Savat bo'sh");
                 return;
             }
             
@@ -970,7 +1124,7 @@ function buildAdminText(order) {
             const fullName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim();
             
             ctx.session.orderData = {
-                name: fullName || 'Noma’lum',
+                name: fullName || "Noma'lum",
                 username: ctx.from.username || '',
                 deliveryType: null,
                 paymentMethod: null
@@ -981,10 +1135,10 @@ function buildAdminText(order) {
             await ctx.answerCbQuery();
             
             return ctx.reply(
-                "🚚 Buyurtma qanday bo‘ladi?",
+                "Buyurtma qanday bo'ladi?",
                 Markup.keyboard([
                     ['🚚 Yetkazib berish'],
-                    ['📦 O‘zim olib ketaman']
+                    ["📦 O'zim olib ketaman"]
                 ]).resize().oneTime()
             );
         });
@@ -996,7 +1150,7 @@ function buildAdminText(order) {
             ctx.session.step = 'payment_method';
             
             return ctx.reply(
-                "💳 To‘lov turini tanlang:",
+                "To'lov turini tanlang:",
                 Markup.keyboard([
                     ['💵 Naqd'],
                     ['💳 Click']
@@ -1004,14 +1158,14 @@ function buildAdminText(order) {
             );
         });
         
-        bot.hears('📦 O‘zim olib ketaman', (ctx) => {
+        bot.hears("📦 O'zim olib ketaman", (ctx) => {
             if (ctx.session.step !== 'delivery_type') return;
             
             ctx.session.orderData.deliveryType = 'pickup';
             ctx.session.step = 'payment_method';
             
             return ctx.reply(
-                "💳 To‘lov turini tanlang:",
+                "To'lov turini tanlang:",
                 Markup.keyboard([
                     ['💵 Naqd'],
                     ['💳 Click']
@@ -1026,9 +1180,9 @@ function buildAdminText(order) {
             ctx.session.step = 'phone';
             
             return ctx.reply(
-                '📱 Telefon raqamingizni yuboring:',
+                'Telefon raqamingizni yuboring:',
                 Markup.keyboard([
-                    [Markup.button.contactRequest('📱 Telefon yuborish')]
+                    [Markup.button.contactRequest('Telefon yuborish')]
                 ]).resize().oneTime()
             );
         });
@@ -1037,16 +1191,16 @@ function buildAdminText(order) {
             if (ctx.session.step !== 'payment_method') return;
             
             if (!CLICK_PROVIDER_TOKEN) {
-                return ctx.reply("❌ Click token topilmadi. Admin bilan bog‘laning.");
+                return ctx.reply("Click token topilmadi. Admin bilan bog'laning.");
             }
             
             ctx.session.orderData.paymentMethod = 'click';
             ctx.session.step = 'phone';
             
             return ctx.reply(
-                '📱 Telefon raqamingizni yuboring:',
+                'Telefon raqamingizni yuboring:',
                 Markup.keyboard([
-                    [Markup.button.contactRequest('📱 Telefon yuborish')]
+                    [Markup.button.contactRequest('Telefon yuborish')]
                 ]).resize().oneTime()
             );
         });
@@ -1059,25 +1213,25 @@ function buildAdminText(order) {
             if (ctx.session.orderData.deliveryType === 'pickup') {
                 return finalizeOrder(
                     ctx,
-                    { text: "O‘zi olib ketadi" },
-                    "📦 O‘zi olib ketadi"
+                    { text: "O'zi olib ketadi" },
+                    "O'zi olib ketadi"
                 );
             }
             
             ctx.session.step = 'address';
             
             return ctx.reply(
-                '📍 Manzilni yuboring.\n\n1) Qo‘lda yozsangiz bo‘ladi\n2) Yoki lokatsiya yuborsangiz bo‘ladi',
+                "Manzilni yuboring.\n\n1) Qo'lda yozsangiz bo'ladi\n2) Yoki lokatsiya yuborsangiz bo'ladi",
                 Markup.keyboard([
-                    [Markup.button.locationRequest('📍 Lokatsiya yuborish')],
-                    ['✍️ Manzilni yozaman']
+                    [Markup.button.locationRequest('Lokatsiya yuborish')],
+                    ["Manzilni yozaman"]
                 ]).resize()
             );
         });
         
-        bot.hears('✍️ Manzilni yozaman', (ctx) => {
+        bot.hears("Manzilni yozaman", (ctx) => {
             if (ctx.session.step !== 'address') return;
-            return ctx.reply('Manzilni yozib yuboring:\n\nMasalan: Shovot tumani, Bozor ko‘chasi 12-uy');
+            return ctx.reply("Manzilni yozib yuboring:\n\nMasalan: Toshkent, Chilonzor, 12-uy");
         });
         
         bot.on('location', async (ctx) => {
@@ -1092,7 +1246,7 @@ function buildAdminText(order) {
                     lon: longitude,
                     text: `${latitude}, ${longitude}`
                 },
-                '📍 Lokatsiya yuborildi'
+                'Lokatsiya yuborildi'
             );
         });
         
@@ -1100,14 +1254,14 @@ function buildAdminText(order) {
             const text = (ctx.message.text || '').trim();
             
             if (ctx.session.step === 'address') {
-                if (!text || text.length < 5 || text === '✍️ Manzilni yozaman') {
-                    return ctx.reply('Iltimos, manzilni to‘liqroq yozing.');
+                if (!text || text.length < 5 || text === "Manzilni yozaman") {
+                    return ctx.reply("Iltimos, manzilni to'liqroq yozing.");
                 }
                 
                 return finalizeOrder(
                     ctx,
                     { text },
-                    `📍 Manzil: ${text}`
+                    `Manzil: ${text}`
                 );
             }
             
@@ -1146,10 +1300,10 @@ function buildAdminText(order) {
                 await bot.telegram.sendMessage(
                     updatedOrder.chatId,
                     [
-                        '📦 Buyurtma holati yangilandi!',
+                        'Buyurtma holati yangilandi!',
                         '',
-                        `🆔 Buyurtma ID: ${updatedOrder.id}`,
-                        `📌 Yangi status: ${updatedOrder.status}`
+                        `Buyurtma ID: ${updatedOrder.id}`,
+                        `Yangi status: ${updatedOrder.status}`
                     ].join('\n'),
                     mainKeyboard
                 );
@@ -1159,8 +1313,12 @@ function buildAdminText(order) {
         });
         
         bot.hears('☎️ Aloqa', (ctx) => {
-            return ctx.reply(`☎️ Aloqa uchun: +998 90 123 45 67\n${getWorkHoursText()}`, mainKeyboard);
+            return ctx.reply(`Aloqa uchun: +998 90 123 45 67\nIsh vaqti: ${getWorkHoursText()}`, mainKeyboard);
         });
+        
+        // =============================================
+        // EXPRESS API
+        // =============================================
         
         app.get('/', (req, res) => {
             res.send('Bot + API ishlayapti');
@@ -1289,10 +1447,10 @@ function buildAdminText(order) {
                 await sendTelegramMessage(
                     updated.chatId,
                     [
-                        '📦 Buyurtma holati yangilandi!',
+                        'Buyurtma holati yangilandi!',
                         '',
-                        `🆔 Buyurtma ID: ${updated.id}`,
-                        `📌 Yangi status: ${updated.status}`
+                        `Buyurtma ID: ${updated.id}`,
+                        `Yangi status: ${updated.status}`
                     ].join('\n')
                 );
                 
@@ -1355,6 +1513,7 @@ function buildAdminText(order) {
             const acceptedOrders = orders.filter((o) => o.status === 'Qabul qilindi').length;
             const readyOrders = orders.filter((o) => o.status === 'Tayyor').length;
             const deliveredOrders = orders.filter((o) => o.status === 'Yetkazildi').length;
+            const cancelledOrders = orders.filter((o) => o.status === 'Bekor qilindi').length;
             const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total || 0), 0);
             const cashRevenue = orders
             .filter((o) => (o.paymentMethod || 'cash') === 'cash')
@@ -1371,6 +1530,7 @@ function buildAdminText(order) {
                 acceptedOrders,
                 readyOrders,
                 deliveredOrders,
+                cancelledOrders,
                 totalRevenue,
                 cashRevenue,
                 clickRevenue,
@@ -1383,26 +1543,30 @@ function buildAdminText(order) {
             console.error('BOT ERROR:', err);
         });
         
+        // =============================================
+        // START
+        // =============================================
+        
         async function startApp() {
             await connectDb();
             await initMenu();
             await initOrders();
             
             app.listen(PORT, () => {
-                console.log(`🌐 Server ishladi: ${PORT}`);
+                console.log(`Server ishladi: ${PORT}`);
             });
             
             try {
                 await bot.telegram.deleteWebhook();
             } catch (error) {
-                console.log('Webhook o‘chirishda xato:', error.message);
+                console.log("Webhook o'chirishda xato:", error.message);
             }
             
             try {
                 await bot.launch();
-                console.log('✅ Bot ishga tushdi');
-                console.log('ADMIN_CHAT_ID:', ADMIN_CHAT_ID || 'yo‘q');
-                console.log('CLICK_PROVIDER_TOKEN:', CLICK_PROVIDER_TOKEN ? 'mavjud' : 'yo‘q');
+                console.log('Bot ishga tushdi');
+                console.log('ADMIN_CHAT_ID:', ADMIN_CHAT_ID || "yo'q");
+                console.log('CLICK_PROVIDER_TOKEN:', CLICK_PROVIDER_TOKEN ? 'mavjud' : "yo'q");
                 console.log('WORK HOURS:', `${WORK_START} - ${WORK_END}`);
                 console.log('CURRENT TIME:', getCurrentTimeText());
                 console.log('IS OPEN:', isRestaurantOpen());
