@@ -36,6 +36,7 @@ const TIME_ZONE = 'Asia/Tashkent';
 const WORK_START = process.env.WORK_START || '09:00';
 const WORK_END = process.env.WORK_END || '23:00';
 const PORT = Number(process.env.PORT || 10000);
+const CLICK_PAYMENT_TIMEOUT_MS = 10 * 60 * 1000; // 10 minut
 
 if (!BOT_TOKEN) {
     throw new Error('BOT_TOKEN topilmadi');
@@ -48,6 +49,7 @@ app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 
 const sseClients = new Set();
+const paymentTimers = new Map();
 
 function sendSseEvent(type, payload = {}) {
     const data = `data: ${JSON.stringify({
@@ -241,6 +243,14 @@ function getPaymentStatusText(paymentStatus) {
     if (paymentStatus === 'paid') return '✅ To‘langan';
     if (paymentStatus === 'failed') return '❌ To‘lov muvaffaqiyatsiz';
     return '⏳ To‘lov kutilmoqda';
+}
+
+function clearPaymentTimer(orderId) {
+    const existing = paymentTimers.get(String(orderId));
+    if (existing) {
+        clearTimeout(existing);
+        paymentTimers.delete(String(orderId));
+    }
 }
 
 function buildAdminText(order) {
@@ -445,6 +455,65 @@ function buildAdminText(order) {
         });
     }
     
+    async function cancelExpiredClickOrder(orderId) {
+        try {
+            const order = getOrderById(orderId);
+            
+            if (!order) {
+                clearPaymentTimer(orderId);
+                return;
+            }
+            
+            if (order.paymentMethod !== 'click') {
+                clearPaymentTimer(orderId);
+                return;
+            }
+            
+            if (order.paymentStatus === 'paid') {
+                clearPaymentTimer(orderId);
+                return;
+            }
+            
+            if (order.status === 'Bekor qilindi' || order.status === 'Yetkazildi') {
+                clearPaymentTimer(orderId);
+                return;
+            }
+            
+            const updatedOrder = await updateOrderStatus(orderId, 'Bekor qilindi');
+            sendSseEvent('order_updated', updatedOrder);
+            await syncAdminOrderMessage(updatedOrder);
+            
+            try {
+                await bot.telegram.sendMessage(
+                    updatedOrder.chatId,
+                    [
+                        '❌ Buyurtma bekor qilindi.',
+                        '',
+                        `🆔 Buyurtma ID: ${updatedOrder.id}`,
+                        '⏰ Sabab: 10 daqiqa ichida Click to‘lovi amalga oshirilmadi.'
+                    ].join('\n'),
+                    mainKeyboard
+                );
+            } catch (error) {
+                console.log('Mijozga cancel xabari yuborishda xato:', error.message);
+            }
+            
+            clearPaymentTimer(orderId);
+        } catch (error) {
+            console.log('Click timeout cancel xato:', error.message);
+        }
+    }
+    
+    function scheduleClickPaymentTimeout(orderId) {
+        clearPaymentTimer(orderId);
+        
+        const timer = setTimeout(async () => {
+            await cancelExpiredClickOrder(orderId);
+        }, CLICK_PAYMENT_TIMEOUT_MS);
+        
+        paymentTimers.set(String(orderId), timer);
+    }
+    
     async function finalizeOrder(ctx, locationData, locationNoticeText) {
         clearUnavailableCartItems(ctx.session.cart);
         
@@ -502,849 +571,868 @@ function buildAdminText(order) {
             order.cartText,
             `💰 Jami: ${formatPrice(order.total)}`,
             '',
-            `📌 Holat: ${order.status}`
-        ].join('\n');
-        
-        if (ADMIN_CHAT_ID) {
-            try {
-                const adminMessage = await bot.telegram.sendMessage(
-                    ADMIN_CHAT_ID,
-                    buildAdminText(order),
-                    getButtonsByStatus(order)
-                );
-                
-                let adminLocationMessageId = null;
-                
-                if (locationData?.lat && locationData?.lon) {
-                    const locationMessage = await bot.telegram.sendLocation(
+            `📌 Holat: ${order.status}`,
+            ...(order.paymentMethod === 'click'
+                ? ['', '⏳ Click to‘lovi uchun 10 daqiqa vaqt beriladi.', 'Agar vaqtida to‘lov qilinmasa buyurtma avtomatik bekor bo‘ladi.']
+                : [])
+            ].join('\n');
+            
+            if (ADMIN_CHAT_ID) {
+                try {
+                    const adminMessage = await bot.telegram.sendMessage(
                         ADMIN_CHAT_ID,
-                        locationData.lat,
-                        locationData.lon
+                        buildAdminText(order),
+                        getButtonsByStatus(order)
                     );
-                    adminLocationMessageId = locationMessage?.message_id ?? null;
+                    
+                    let adminLocationMessageId = null;
+                    
+                    if (locationData?.lat && locationData?.lon) {
+                        const locationMessage = await bot.telegram.sendLocation(
+                            ADMIN_CHAT_ID,
+                            locationData.lat,
+                            locationData.lon
+                        );
+                        adminLocationMessageId = locationMessage?.message_id ?? null;
+                    }
+                    
+                    await updateOrderAdminMessages(order.id, {
+                        adminMessageId: adminMessage?.message_id ?? null,
+                        adminLocationMessageId
+                    });
+                    
+                    const freshOrder = getOrderById(order.id);
+                    if (freshOrder) {
+                        sendSseEvent('order_updated', freshOrder);
+                    }
+                } catch (error) {
+                    console.log('Admin ga yuborishda xato:', error.message);
+                }
+            }
+            
+            ctx.session.cart = {};
+            ctx.session.step = null;
+            ctx.session.orderData = {};
+            ctx.session.currentCategory = null;
+            
+            await ctx.reply(userText, mainKeyboard);
+            
+            if (order.paymentMethod === 'click') {
+                try {
+                    await sendClickInvoice(ctx, order);
+                    scheduleClickPaymentTimeout(order.id);
+                } catch (error) {
+                    console.log('Click invoice yuborishda xato:', error.message);
+                    await ctx.reply("❌ Click invoice yuborilmadi. Tokenni yoki BotFather ulanishini tekshiring.");
+                }
+            }
+            
+            return;
+        }
+        
+        bot.on('pre_checkout_query', async (ctx) => {
+            try {
+                await ctx.answerPreCheckoutQuery(true);
+            } catch (error) {
+                console.log('Pre-checkout xato:', error.message);
+            }
+        });
+        
+        bot.on('successful_payment', async (ctx) => {
+            try {
+                const payload = ctx.message.successful_payment?.invoice_payload || '';
+                const telegramChargeId = ctx.message.successful_payment?.telegram_payment_charge_id || null;
+                const providerChargeId = ctx.message.successful_payment?.provider_payment_charge_id || null;
+                
+                if (!payload.startsWith('order_')) {
+                    return ctx.reply('To‘lov qabul qilindi.');
                 }
                 
-                await updateOrderAdminMessages(order.id, {
-                    adminMessageId: adminMessage?.message_id ?? null,
-                    adminLocationMessageId
+                const orderId = payload.replace('order_', '');
+                const order = getOrderById(orderId);
+                
+                if (!order) {
+                    return ctx.reply('To‘lov qabul qilindi, lekin buyurtma topilmadi.');
+                }
+                
+                clearPaymentTimer(orderId);
+                
+                const updated = await updateOrderPayment(orderId, {
+                    paymentMethod: 'click',
+                    paymentStatus: 'paid',
+                    paidAt: new Date().toISOString(),
+                    clickTransactionId: providerChargeId || telegramChargeId || null
                 });
                 
-                const freshOrder = getOrderById(order.id);
-                if (freshOrder) {
-                    sendSseEvent('order_updated', freshOrder);
+                sendSseEvent('order_updated', updated);
+                await syncAdminOrderMessage(updated);
+                
+                await ctx.reply(
+                    [
+                        '✅ Click to‘lovi muvaffaqiyatli qabul qilindi!',
+                        '',
+                        `🆔 Buyurtma ID: ${updated.id}`,
+                        `💳 To‘lov turi: ${getPaymentMethodText(updated.paymentMethod)}`,
+                        `💰 To‘lov holati: ${getPaymentStatusText(updated.paymentStatus)}`
+                    ].join('\n'),
+                    mainKeyboard
+                );
+            } catch (error) {
+                console.log('Successful payment xato:', error.message);
+            }
+        });
+        
+        async function sendTelegramMessage(chatId, text) {
+            if (!BOT_TOKEN || !chatId) return;
+            
+            try {
+                const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: chatId, text })
+                });
+                
+                const data = await response.json();
+                if (!data.ok) {
+                    console.log('Telegram API xato:', data.description);
                 }
             } catch (error) {
-                console.log('Admin ga yuborishda xato:', error.message);
+                console.log('Telegramga xabar yuborishda xato:', error.message);
             }
         }
         
-        ctx.session.cart = {};
-        ctx.session.step = null;
-        ctx.session.orderData = {};
-        ctx.session.currentCategory = null;
+        bot.start((ctx) => {
+            clearUnavailableCartItems(ctx.session.cart);
+            ctx.session.step = null;
+            ctx.session.orderData = {};
+            ctx.session.currentCategory = null;
+            
+            return ctx.reply('Assalomu alaykum! Restoran botga xush kelibsiz.', mainKeyboard);
+        });
         
-        await ctx.reply(userText, mainKeyboard);
+        bot.command('list', async (ctx) => {
+            if (!isAdminChat(ctx)) return;
+            return ctx.reply(formatMenuList());
+        });
         
-        if (order.paymentMethod === 'click') {
+        bot.command('add', async (ctx) => {
+            if (!isAdminChat(ctx)) return;
+            
+            const parsed = parseAddOrEditCommand(ctx.message.text, '/add');
+            if (!parsed) {
+                return ctx.reply(
+                    'Format noto‘g‘ri.\n\n/add key|Nomi|Narx|Kategoriya|ImageURL\n\nMasalan:\n/add hotdog|Hot Dog|18000|Fast Food|https://site.com/hotdog.jpg\n\nAgar rasm bo‘lmasa oxiriga - yoz:\n/add hotdog|Hot Dog|18000|Fast Food|-'
+                );
+            }
+            
             try {
-                await sendClickInvoice(ctx, order);
+                await addMenuItem(parsed.key, parsed.name, parsed.price, parsed.category, parsed.image);
+                sendSseEvent('menu_updated');
+                return ctx.reply(`✅ Qo‘shildi:\n${parsed.name} — ${formatPrice(parsed.price)}\ncategory: ${parsed.category}\nkey: ${parsed.key}`);
             } catch (error) {
-                console.log('Click invoice yuborishda xato:', error.message);
-                await ctx.reply("❌ Click invoice yuborilmadi. Tokenni yoki BotFather ulanishini tekshiring.");
+                return ctx.reply(`❌ ${error.message}`);
             }
-        }
-    }
-    
-    /* TELEGRAM PAYMENTS */
-    
-    bot.on('pre_checkout_query', async (ctx) => {
-        try {
-            await ctx.answerPreCheckoutQuery(true);
-        } catch (error) {
-            console.log('Pre-checkout xato:', error.message);
-        }
-    });
-    
-    bot.on('successful_payment', async (ctx) => {
-        try {
-            const payload = ctx.message.successful_payment?.invoice_payload || '';
-            const telegramChargeId = ctx.message.successful_payment?.telegram_payment_charge_id || null;
-            const providerChargeId = ctx.message.successful_payment?.provider_payment_charge_id || null;
+        });
+        
+        bot.command('edit', async (ctx) => {
+            if (!isAdminChat(ctx)) return;
             
-            if (!payload.startsWith('order_')) {
-                return ctx.reply('To‘lov qabul qilindi.');
+            const parsed = parseAddOrEditCommand(ctx.message.text, '/edit');
+            if (!parsed) {
+                return ctx.reply(
+                    'Format noto‘g‘ri.\n\n/edit key|Yangi Nomi|Yangi Narx|Kategoriya|ImageURL\n\nMasalan:\n/edit hotdog|Hot Dog Big|22000|Fast Food|https://site.com/hotdog2.jpg'
+                );
             }
             
-            const orderId = payload.replace('order_', '');
+            try {
+                await editMenuItem(parsed.key, parsed.name, parsed.price, parsed.category, parsed.image);
+                sendSseEvent('menu_updated');
+                return ctx.reply(`✅ Yangilandi:\n${parsed.name} — ${formatPrice(parsed.price)}\ncategory: ${parsed.category}\nkey: ${parsed.key}`);
+            } catch (error) {
+                return ctx.reply(`❌ ${error.message}`);
+            }
+        });
+        
+        bot.command('delete', async (ctx) => {
+            if (!isAdminChat(ctx)) return;
+            
+            const rawKey = ctx.message.text.replace('/delete', '').trim();
+            const key = normalizeKey(rawKey);
+            
+            if (!key) return ctx.reply('Format: /delete key\n\nMasalan:\n/delete hotdog');
+            
+            try {
+                const deleted = await deleteMenuItem(key);
+                sendSseEvent('menu_updated');
+                return ctx.reply(`🗑 O‘chirildi:\n${deleted.name}\nkey: ${deleted.key}`);
+            } catch (error) {
+                return ctx.reply(`❌ ${error.message}`);
+            }
+        });
+        
+        bot.command('hide', async (ctx) => {
+            if (!isAdminChat(ctx)) return;
+            
+            const rawKey = ctx.message.text.replace('/hide', '').trim();
+            const key = normalizeKey(rawKey);
+            
+            if (!key) return ctx.reply('Format: /hide key\n\nMasalan:\n/hide cola');
+            
+            try {
+                const item = await setMenuItemActive(key, false);
+                sendSseEvent('menu_updated');
+                return ctx.reply(`🙈 Yashirildi:\n${item.name}\nkey: ${item.key}`);
+            } catch (error) {
+                return ctx.reply(`❌ ${error.message}`);
+            }
+        });
+        
+        bot.command('show', async (ctx) => {
+            if (!isAdminChat(ctx)) return;
+            
+            const rawKey = ctx.message.text.replace('/show', '').trim();
+            const key = normalizeKey(rawKey);
+            
+            if (!key) return ctx.reply('Format: /show key\n\nMasalan:\n/show cola');
+            
+            try {
+                const item = await setMenuItemActive(key, true);
+                sendSseEvent('menu_updated');
+                return ctx.reply(`👀 Qayta ochildi:\n${item.name}\nkey: ${item.key}`);
+            } catch (error) {
+                return ctx.reply(`❌ ${error.message}`);
+            }
+        });
+        
+        bot.command('stats', async (ctx) => {
+            if (!isAdminChat(ctx)) return;
+            
+            const stats = getTodayStats(TIME_ZONE);
+            const allOrders = getAllOrders();
+            
+            return ctx.reply([
+                '📊 Bugungi statistika:',
+                '',
+                `📅 Sana: ${stats.date}`,
+                `🧾 Bugungi buyurtmalar: ${stats.totalOrders}`,
+                `🆕 Yangi: ${stats.newOrders}`,
+                `✅ Qabul qilingan: ${stats.acceptedOrders}`,
+                `👨‍🍳 Tayyor: ${stats.readyOrders}`,
+                `🚚 Yetkazilgan: ${stats.deliveredOrders}`,
+                `💰 Bugungi jami summa: ${formatPrice(stats.totalRevenue)}`,
+                `💵 Naqd tushum: ${formatPrice(stats.cashRevenue)}`,
+                `💳 Click tushum: ${formatPrice(stats.clickRevenue)}`,
+                `✅ To‘langan buyurtmalar: ${stats.paidOrders}`,
+                `⏳ To‘lov kutilayotganlar: ${stats.pendingPaymentOrders}`,
+                '',
+                `📦 Umumiy buyurtmalar soni: ${allOrders.length}`,
+                '',
+                getWorkHoursText(),
+                `🕐 Hozirgi vaqt: ${getCurrentTimeText()}`
+            ].join('\n'));
+        });
+        
+        bot.hears('🍽 Menyu', async (ctx) => {
+            clearUnavailableCartItems(ctx.session.cart);
+            ctx.session.currentCategory = null;
+            return renderCategories(ctx);
+        });
+        
+        bot.action('back_to_categories', async (ctx) => {
+            await ctx.answerCbQuery();
+            ctx.session.currentCategory = null;
+            return renderCategories(ctx, true);
+        });
+        
+        bot.action(/^cat_(.+)$/, async (ctx) => {
+            await ctx.answerCbQuery();
+            const category = decodeURIComponent(ctx.match[1]);
+            return renderCategoryProducts(ctx, category, true);
+        });
+        
+        bot.action('ignore', async (ctx) => {
+            await ctx.answerCbQuery();
+        });
+        
+        bot.action(/^view_(.+)$/, async (ctx) => {
+            const key = ctx.match[1];
+            const item = getMenuItem(key);
+            
+            if (!item || !item.active) {
+                await ctx.answerCbQuery('Mahsulot topilmadi');
+                return;
+            }
+            
+            await ctx.answerCbQuery();
+            
+            const caption = [
+                `🍽 ${item.name}`,
+                `📂 Kategoriya: ${item.category}`,
+                `💰 Narx: ${formatPrice(item.price)}`
+            ].join('\n');
+            
+            if (item.image) {
+                try {
+                    return await ctx.replyWithPhoto(item.image, { caption });
+                } catch {
+                    return await ctx.reply(caption);
+                }
+            }
+            
+            return ctx.reply(caption);
+        });
+        
+        bot.action(/^add_(.+)$/, async (ctx) => {
+            const key = ctx.match[1];
+            const item = getMenuItem(key);
+            
+            if (!item || !item.active) {
+                await ctx.answerCbQuery('Mahsulot topilmadi');
+                return;
+            }
+            
+            ctx.session.cart[key] = (ctx.session.cart[key] || 0) + 1;
+            await ctx.answerCbQuery(`${item.name} qo‘shildi`);
+            
+            if (ctx.session.currentCategory) {
+                return renderCategoryProducts(ctx, ctx.session.currentCategory, true);
+            }
+            
+            return renderCategories(ctx, true);
+        });
+        
+        bot.action(/^minus_(.+)$/, async (ctx) => {
+            const key = ctx.match[1];
+            const item = getMenuItem(key);
+            
+            if (!item || !item.active) {
+                await ctx.answerCbQuery('Mahsulot topilmadi');
+                return;
+            }
+            
+            if ((ctx.session.cart[key] || 0) > 0) {
+                ctx.session.cart[key] -= 1;
+            }
+            
+            await ctx.answerCbQuery(`${item.name} kamaytirildi`);
+            
+            if (ctx.session.currentCategory) {
+                return renderCategoryProducts(ctx, ctx.session.currentCategory, true);
+            }
+            
+            return renderCategories(ctx, true);
+        });
+        
+        bot.hears('🛒 Savat', (ctx) => {
+            clearUnavailableCartItems(ctx.session.cart);
+            
+            const total = getCartTotal(ctx.session.cart);
+            const text = getCartText(ctx.session.cart);
+            
+            if (total === 0) return ctx.reply(text);
+            
+            return ctx.reply(`${text}\n💰 Jami: ${formatPrice(total)}`, getCartButtons(ctx.session.cart));
+        });
+        
+        bot.action('open_cart', async (ctx) => {
+            clearUnavailableCartItems(ctx.session.cart);
+            await ctx.answerCbQuery();
+            
+            const total = getCartTotal(ctx.session.cart);
+            const text = getCartText(ctx.session.cart);
+            
+            if (total === 0) return ctx.reply(text);
+            
+            return ctx.reply(`${text}\n💰 Jami: ${formatPrice(total)}`, getCartButtons(ctx.session.cart));
+        });
+        
+        bot.action('clear_cart', async (ctx) => {
+            ctx.session.cart = {};
+            await ctx.answerCbQuery('Savat tozalandi');
+            return ctx.reply('🗑 Savat tozalandi.', mainKeyboard);
+        });
+        
+        bot.action('checkout', async (ctx) => {
+            clearUnavailableCartItems(ctx.session.cart);
+            
+            const total = getCartTotal(ctx.session.cart);
+            
+            if (total === 0) {
+                await ctx.answerCbQuery('Savat bo‘sh');
+                return;
+            }
+            
+            if (!isRestaurantOpen()) {
+                await ctx.answerCbQuery('Hozir yopiqmiz');
+                return ctx.reply(getClosedText(), mainKeyboard);
+            }
+            
+            const fullName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim();
+            
+            ctx.session.orderData = {
+                name: fullName || 'Noma’lum',
+                username: ctx.from.username || '',
+                deliveryType: null,
+                paymentMethod: null
+            };
+            
+            ctx.session.step = 'delivery_type';
+            
+            await ctx.answerCbQuery();
+            
+            return ctx.reply(
+                "🚚 Buyurtma qanday bo‘ladi?",
+                Markup.keyboard([
+                    ['🚚 Yetkazib berish'],
+                    ['📦 O‘zim olib ketaman']
+                ]).resize().oneTime()
+            );
+        });
+        
+        bot.hears('🚚 Yetkazib berish', (ctx) => {
+            if (ctx.session.step !== 'delivery_type') return;
+            
+            ctx.session.orderData.deliveryType = 'delivery';
+            ctx.session.step = 'payment_method';
+            
+            return ctx.reply(
+                "💳 To‘lov turini tanlang:",
+                Markup.keyboard([
+                    ['💵 Naqd'],
+                    ['💳 Click']
+                ]).resize().oneTime()
+            );
+        });
+        
+        bot.hears('📦 O‘zim olib ketaman', (ctx) => {
+            if (ctx.session.step !== 'delivery_type') return;
+            
+            ctx.session.orderData.deliveryType = 'pickup';
+            ctx.session.step = 'payment_method';
+            
+            return ctx.reply(
+                "💳 To‘lov turini tanlang:",
+                Markup.keyboard([
+                    ['💵 Naqd'],
+                    ['💳 Click']
+                ]).resize().oneTime()
+            );
+        });
+        
+        bot.hears('💵 Naqd', (ctx) => {
+            if (ctx.session.step !== 'payment_method') return;
+            
+            ctx.session.orderData.paymentMethod = 'cash';
+            ctx.session.step = 'phone';
+            
+            return ctx.reply(
+                '📱 Telefon raqamingizni yuboring:',
+                Markup.keyboard([
+                    [Markup.button.contactRequest('📱 Telefon yuborish')]
+                ]).resize().oneTime()
+            );
+        });
+        
+        bot.hears('💳 Click', (ctx) => {
+            if (ctx.session.step !== 'payment_method') return;
+            
+            if (!CLICK_PROVIDER_TOKEN) {
+                return ctx.reply("❌ Click token topilmadi. Admin bilan bog‘laning.");
+            }
+            
+            ctx.session.orderData.paymentMethod = 'click';
+            ctx.session.step = 'phone';
+            
+            return ctx.reply(
+                '📱 Telefon raqamingizni yuboring:',
+                Markup.keyboard([
+                    [Markup.button.contactRequest('📱 Telefon yuborish')]
+                ]).resize().oneTime()
+            );
+        });
+        
+        bot.on('contact', (ctx) => {
+            if (ctx.session.step !== 'phone') return;
+            
+            ctx.session.orderData.phone = ctx.message.contact.phone_number;
+            
+            if (ctx.session.orderData.deliveryType === 'pickup') {
+                return finalizeOrder(
+                    ctx,
+                    { text: "O‘zi olib ketadi" },
+                    "📦 O‘zi olib ketadi"
+                );
+            }
+            
+            ctx.session.step = 'address';
+            
+            return ctx.reply(
+                '📍 Manzilni yuboring.\n\n1) Qo‘lda yozsangiz bo‘ladi\n2) Yoki lokatsiya yuborsangiz bo‘ladi',
+                Markup.keyboard([
+                    [Markup.button.locationRequest('📍 Lokatsiya yuborish')],
+                    ['✍️ Manzilni yozaman']
+                ]).resize()
+            );
+        });
+        
+        bot.hears('✍️ Manzilni yozaman', (ctx) => {
+            if (ctx.session.step !== 'address') return;
+            return ctx.reply('Manzilni yozib yuboring:\n\nMasalan: Shovot tumani, Bozor ko‘chasi 12-uy');
+        });
+        
+        bot.on('location', async (ctx) => {
+            if (ctx.session.step !== 'address') return;
+            
+            const { latitude, longitude } = ctx.message.location;
+            
+            return finalizeOrder(
+                ctx,
+                {
+                    lat: latitude,
+                    lon: longitude,
+                    text: `${latitude}, ${longitude}`
+                },
+                '📍 Lokatsiya yuborildi'
+            );
+        });
+        
+        bot.on('text', async (ctx, next) => {
+            const text = (ctx.message.text || '').trim();
+            
+            if (ctx.session.step === 'address') {
+                if (!text || text.length < 5 || text === '✍️ Manzilni yozaman') {
+                    return ctx.reply('Iltimos, manzilni to‘liqroq yozing.');
+                }
+                
+                return finalizeOrder(
+                    ctx,
+                    { text },
+                    `📍 Manzil: ${text}`
+                );
+            }
+            
+            return next();
+        });
+        
+        bot.action(/^status_(\d+)_(.+)$/, async (ctx) => {
+            const orderId = ctx.match[1];
+            const newStatus = ctx.match[2];
+            
             const order = getOrderById(orderId);
-            
             if (!order) {
-                return ctx.reply('To‘lov qabul qilindi, lekin buyurtma topilmadi.');
+                await ctx.answerCbQuery('Buyurtma topilmadi');
+                return;
             }
             
-            const updated = await updateOrderPayment(orderId, {
-                paymentMethod: 'click',
-                paymentStatus: 'paid',
-                paidAt: new Date().toISOString(),
-                clickTransactionId: providerChargeId || telegramChargeId || null
-            });
+            const updatedOrder = await updateOrderStatus(orderId, newStatus);
+            sendSseEvent('order_updated', updatedOrder);
             
-            sendSseEvent('order_updated', updated);
-            await syncAdminOrderMessage(updated);
+            await ctx.answerCbQuery(`Status: ${newStatus}`);
             
-            await ctx.reply(
-                [
-                    '✅ Click to‘lovi muvaffaqiyatli qabul qilindi!',
-                    '',
-                    `🆔 Buyurtma ID: ${updated.id}`,
-                    `💳 To‘lov turi: ${getPaymentMethodText(updated.paymentMethod)}`,
-                    `💰 To‘lov holati: ${getPaymentStatusText(updated.paymentStatus)}`
-                ].join('\n'),
-                mainKeyboard
-            );
-        } catch (error) {
-            console.log('Successful payment xato:', error.message);
-        }
-    });
-    
-    async function sendTelegramMessage(chatId, text) {
-        if (!BOT_TOKEN || !chatId) return;
-        
-        try {
-            const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: chatId, text })
-            });
-            
-            const data = await response.json();
-            if (!data.ok) {
-                console.log('Telegram API xato:', data.description);
-            }
-        } catch (error) {
-            console.log('Telegramga xabar yuborishda xato:', error.message);
-        }
-    }
-    
-    /* BOT */
-    
-    bot.start((ctx) => {
-        clearUnavailableCartItems(ctx.session.cart);
-        ctx.session.step = null;
-        ctx.session.orderData = {};
-        ctx.session.currentCategory = null;
-        
-        return ctx.reply('Assalomu alaykum! Restoran botga xush kelibsiz.', mainKeyboard);
-    });
-    
-    bot.command('list', async (ctx) => {
-        if (!isAdminChat(ctx)) return;
-        return ctx.reply(formatMenuList());
-    });
-    
-    bot.command('add', async (ctx) => {
-        if (!isAdminChat(ctx)) return;
-        
-        const parsed = parseAddOrEditCommand(ctx.message.text, '/add');
-        if (!parsed) {
-            return ctx.reply(
-                'Format noto‘g‘ri.\n\n/add key|Nomi|Narx|Kategoriya|ImageURL\n\nMasalan:\n/add hotdog|Hot Dog|18000|Fast Food|https://site.com/hotdog.jpg\n\nAgar rasm bo‘lmasa oxiriga - yoz:\n/add hotdog|Hot Dog|18000|Fast Food|-'
-            );
-        }
-        
-        try {
-            await addMenuItem(parsed.key, parsed.name, parsed.price, parsed.category, parsed.image);
-            sendSseEvent('menu_updated');
-            return ctx.reply(`✅ Qo‘shildi:\n${parsed.name} — ${formatPrice(parsed.price)}\ncategory: ${parsed.category}\nkey: ${parsed.key}`);
-        } catch (error) {
-            return ctx.reply(`❌ ${error.message}`);
-        }
-    });
-    
-    bot.command('edit', async (ctx) => {
-        if (!isAdminChat(ctx)) return;
-        
-        const parsed = parseAddOrEditCommand(ctx.message.text, '/edit');
-        if (!parsed) {
-            return ctx.reply(
-                'Format noto‘g‘ri.\n\n/edit key|Yangi Nomi|Yangi Narx|Kategoriya|ImageURL\n\nMasalan:\n/edit hotdog|Hot Dog Big|22000|Fast Food|https://site.com/hotdog2.jpg'
-            );
-        }
-        
-        try {
-            await editMenuItem(parsed.key, parsed.name, parsed.price, parsed.category, parsed.image);
-            sendSseEvent('menu_updated');
-            return ctx.reply(`✅ Yangilandi:\n${parsed.name} — ${formatPrice(parsed.price)}\ncategory: ${parsed.category}\nkey: ${parsed.key}`);
-        } catch (error) {
-            return ctx.reply(`❌ ${error.message}`);
-        }
-    });
-    
-    bot.command('delete', async (ctx) => {
-        if (!isAdminChat(ctx)) return;
-        
-        const rawKey = ctx.message.text.replace('/delete', '').trim();
-        const key = normalizeKey(rawKey);
-        
-        if (!key) return ctx.reply('Format: /delete key\n\nMasalan:\n/delete hotdog');
-        
-        try {
-            const deleted = await deleteMenuItem(key);
-            sendSseEvent('menu_updated');
-            return ctx.reply(`🗑 O‘chirildi:\n${deleted.name}\nkey: ${deleted.key}`);
-        } catch (error) {
-            return ctx.reply(`❌ ${error.message}`);
-        }
-    });
-    
-    bot.command('hide', async (ctx) => {
-        if (!isAdminChat(ctx)) return;
-        
-        const rawKey = ctx.message.text.replace('/hide', '').trim();
-        const key = normalizeKey(rawKey);
-        
-        if (!key) return ctx.reply('Format: /hide key\n\nMasalan:\n/hide cola');
-        
-        try {
-            const item = await setMenuItemActive(key, false);
-            sendSseEvent('menu_updated');
-            return ctx.reply(`🙈 Yashirildi:\n${item.name}\nkey: ${item.key}`);
-        } catch (error) {
-            return ctx.reply(`❌ ${error.message}`);
-        }
-    });
-    
-    bot.command('show', async (ctx) => {
-        if (!isAdminChat(ctx)) return;
-        
-        const rawKey = ctx.message.text.replace('/show', '').trim();
-        const key = normalizeKey(rawKey);
-        
-        if (!key) return ctx.reply('Format: /show key\n\nMasalan:\n/show cola');
-        
-        try {
-            const item = await setMenuItemActive(key, true);
-            sendSseEvent('menu_updated');
-            return ctx.reply(`👀 Qayta ochildi:\n${item.name}\nkey: ${item.key}`);
-        } catch (error) {
-            return ctx.reply(`❌ ${error.message}`);
-        }
-    });
-    
-    bot.command('stats', async (ctx) => {
-        if (!isAdminChat(ctx)) return;
-        
-        const stats = getTodayStats(TIME_ZONE);
-        const allOrders = getAllOrders();
-        
-        return ctx.reply([
-            '📊 Bugungi statistika:',
-            '',
-            `📅 Sana: ${stats.date}`,
-            `🧾 Bugungi buyurtmalar: ${stats.totalOrders}`,
-            `🆕 Yangi: ${stats.newOrders}`,
-            `✅ Qabul qilingan: ${stats.acceptedOrders}`,
-            `👨‍🍳 Tayyor: ${stats.readyOrders}`,
-            `🚚 Yetkazilgan: ${stats.deliveredOrders}`,
-            `💰 Bugungi jami summa: ${formatPrice(stats.totalRevenue)}`,
-            `💵 Naqd tushum: ${formatPrice(stats.cashRevenue)}`,
-            `💳 Click tushum: ${formatPrice(stats.clickRevenue)}`,
-            `✅ To‘langan buyurtmalar: ${stats.paidOrders}`,
-            `⏳ To‘lov kutilayotganlar: ${stats.pendingPaymentOrders}`,
-            '',
-            `📦 Umumiy buyurtmalar soni: ${allOrders.length}`,
-            '',
-            getWorkHoursText(),
-            `🕐 Hozirgi vaqt: ${getCurrentTimeText()}`
-        ].join('\n'));
-    });
-    
-    bot.hears('🍽 Menyu', async (ctx) => {
-        clearUnavailableCartItems(ctx.session.cart);
-        ctx.session.currentCategory = null;
-        return renderCategories(ctx);
-    });
-    
-    bot.action('back_to_categories', async (ctx) => {
-        await ctx.answerCbQuery();
-        ctx.session.currentCategory = null;
-        return renderCategories(ctx, true);
-    });
-    
-    bot.action(/^cat_(.+)$/, async (ctx) => {
-        await ctx.answerCbQuery();
-        const category = decodeURIComponent(ctx.match[1]);
-        return renderCategoryProducts(ctx, category, true);
-    });
-    
-    bot.action('ignore', async (ctx) => {
-        await ctx.answerCbQuery();
-    });
-    
-    bot.action(/^view_(.+)$/, async (ctx) => {
-        const key = ctx.match[1];
-        const item = getMenuItem(key);
-        
-        if (!item || !item.active) {
-            await ctx.answerCbQuery('Mahsulot topilmadi');
-            return;
-        }
-        
-        await ctx.answerCbQuery();
-        
-        const caption = [
-            `🍽 ${item.name}`,
-            `📂 Kategoriya: ${item.category}`,
-            `💰 Narx: ${formatPrice(item.price)}`
-        ].join('\n');
-        
-        if (item.image) {
             try {
-                return await ctx.replyWithPhoto(item.image, { caption });
-            } catch {
-                return await ctx.reply(caption);
-            }
-        }
-        
-        return ctx.reply(caption);
-    });
-    
-    bot.action(/^add_(.+)$/, async (ctx) => {
-        const key = ctx.match[1];
-        const item = getMenuItem(key);
-        
-        if (!item || !item.active) {
-            await ctx.answerCbQuery('Mahsulot topilmadi');
-            return;
-        }
-        
-        ctx.session.cart[key] = (ctx.session.cart[key] || 0) + 1;
-        await ctx.answerCbQuery(`${item.name} qo‘shildi`);
-        
-        if (ctx.session.currentCategory) {
-            return renderCategoryProducts(ctx, ctx.session.currentCategory, true);
-        }
-        
-        return renderCategories(ctx, true);
-    });
-    
-    bot.action(/^minus_(.+)$/, async (ctx) => {
-        const key = ctx.match[1];
-        const item = getMenuItem(key);
-        
-        if (!item || !item.active) {
-            await ctx.answerCbQuery('Mahsulot topilmadi');
-            return;
-        }
-        
-        if ((ctx.session.cart[key] || 0) > 0) {
-            ctx.session.cart[key] -= 1;
-        }
-        
-        await ctx.answerCbQuery(`${item.name} kamaytirildi`);
-        
-        if (ctx.session.currentCategory) {
-            return renderCategoryProducts(ctx, ctx.session.currentCategory, true);
-        }
-        
-        return renderCategories(ctx, true);
-    });
-    
-    bot.hears('🛒 Savat', (ctx) => {
-        clearUnavailableCartItems(ctx.session.cart);
-        
-        const total = getCartTotal(ctx.session.cart);
-        const text = getCartText(ctx.session.cart);
-        
-        if (total === 0) return ctx.reply(text);
-        
-        return ctx.reply(`${text}\n💰 Jami: ${formatPrice(total)}`, getCartButtons(ctx.session.cart));
-    });
-    
-    bot.action('open_cart', async (ctx) => {
-        clearUnavailableCartItems(ctx.session.cart);
-        await ctx.answerCbQuery();
-        
-        const total = getCartTotal(ctx.session.cart);
-        const text = getCartText(ctx.session.cart);
-        
-        if (total === 0) return ctx.reply(text);
-        
-        return ctx.reply(`${text}\n💰 Jami: ${formatPrice(total)}`, getCartButtons(ctx.session.cart));
-    });
-    
-    bot.action('clear_cart', async (ctx) => {
-        ctx.session.cart = {};
-        await ctx.answerCbQuery('Savat tozalandi');
-        return ctx.reply('🗑 Savat tozalandi.', mainKeyboard);
-    });
-    
-    bot.action('checkout', async (ctx) => {
-        clearUnavailableCartItems(ctx.session.cart);
-        
-        const total = getCartTotal(ctx.session.cart);
-        
-        if (total === 0) {
-            await ctx.answerCbQuery('Savat bo‘sh');
-            return;
-        }
-        
-        if (!isRestaurantOpen()) {
-            await ctx.answerCbQuery('Hozir yopiqmiz');
-            return ctx.reply(getClosedText(), mainKeyboard);
-        }
-        
-        const fullName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim();
-        
-        ctx.session.orderData = {
-            name: fullName || 'Noma’lum',
-            username: ctx.from.username || '',
-            deliveryType: null,
-            paymentMethod: null
-        };
-        
-        ctx.session.step = 'delivery_type';
-        
-        await ctx.answerCbQuery();
-        
-        return ctx.reply(
-            "🚚 Buyurtma qanday bo‘ladi?",
-            Markup.keyboard([
-                ['🚚 Yetkazib berish'],
-                ['📦 O‘zim olib ketaman']
-            ]).resize().oneTime()
-        );
-    });
-    
-    bot.hears('🚚 Yetkazib berish', (ctx) => {
-        if (ctx.session.step !== 'delivery_type') return;
-        
-        ctx.session.orderData.deliveryType = 'delivery';
-        ctx.session.step = 'payment_method';
-        
-        return ctx.reply(
-            "💳 To‘lov turini tanlang:",
-            Markup.keyboard([
-                ['💵 Naqd'],
-                ['💳 Click']
-            ]).resize().oneTime()
-        );
-    });
-    
-    bot.hears('📦 O‘zim olib ketaman', (ctx) => {
-        if (ctx.session.step !== 'delivery_type') return;
-        
-        ctx.session.orderData.deliveryType = 'pickup';
-        ctx.session.step = 'payment_method';
-        
-        return ctx.reply(
-            "💳 To‘lov turini tanlang:",
-            Markup.keyboard([
-                ['💵 Naqd'],
-                ['💳 Click']
-            ]).resize().oneTime()
-        );
-    });
-    
-    bot.hears('💵 Naqd', (ctx) => {
-        if (ctx.session.step !== 'payment_method') return;
-        
-        ctx.session.orderData.paymentMethod = 'cash';
-        ctx.session.step = 'phone';
-        
-        return ctx.reply(
-            '📱 Telefon raqamingizni yuboring:',
-            Markup.keyboard([
-                [Markup.button.contactRequest('📱 Telefon yuborish')]
-            ]).resize().oneTime()
-        );
-    });
-    
-    bot.hears('💳 Click', (ctx) => {
-        if (ctx.session.step !== 'payment_method') return;
-        
-        if (!CLICK_PROVIDER_TOKEN) {
-            return ctx.reply("❌ Click token topilmadi. Admin bilan bog‘laning.");
-        }
-        
-        ctx.session.orderData.paymentMethod = 'click';
-        ctx.session.step = 'phone';
-        
-        return ctx.reply(
-            '📱 Telefon raqamingizni yuboring:',
-            Markup.keyboard([
-                [Markup.button.contactRequest('📱 Telefon yuborish')]
-            ]).resize().oneTime()
-        );
-    });
-    
-    bot.on('contact', (ctx) => {
-        if (ctx.session.step !== 'phone') return;
-        
-        ctx.session.orderData.phone = ctx.message.contact.phone_number;
-        
-        if (ctx.session.orderData.deliveryType === 'pickup') {
-            return finalizeOrder(
-                ctx,
-                { text: "O‘zi olib ketadi" },
-                "📦 O‘zi olib ketadi"
-            );
-        }
-        
-        ctx.session.step = 'address';
-        
-        return ctx.reply(
-            '📍 Manzilni yuboring.\n\n1) Qo‘lda yozsangiz bo‘ladi\n2) Yoki lokatsiya yuborsangiz bo‘ladi',
-            Markup.keyboard([
-                [Markup.button.locationRequest('📍 Lokatsiya yuborish')],
-                ['✍️ Manzilni yozaman']
-            ]).resize()
-        );
-    });
-    
-    bot.hears('✍️ Manzilni yozaman', (ctx) => {
-        if (ctx.session.step !== 'address') return;
-        return ctx.reply('Manzilni yozib yuboring:\n\nMasalan: Shovot tumani, Bozor ko‘chasi 12-uy');
-    });
-    
-    bot.on('location', async (ctx) => {
-        if (ctx.session.step !== 'address') return;
-        
-        const { latitude, longitude } = ctx.message.location;
-        
-        return finalizeOrder(
-            ctx,
-            {
-                lat: latitude,
-                lon: longitude,
-                text: `${latitude}, ${longitude}`
-            },
-            '📍 Lokatsiya yuborildi'
-        );
-    });
-    
-    bot.on('text', async (ctx, next) => {
-        const text = (ctx.message.text || '').trim();
-        
-        if (ctx.session.step === 'address') {
-            if (!text || text.length < 5 || text === '✍️ Manzilni yozaman') {
-                return ctx.reply('Iltimos, manzilni to‘liqroq yozing.');
+                const nextButtons = getButtonsByStatus(updatedOrder);
+                if (nextButtons) {
+                    await ctx.editMessageText(buildAdminText(updatedOrder), nextButtons);
+                } else {
+                    await ctx.editMessageText(buildAdminText(updatedOrder));
+                }
+            } catch (error) {
+                console.log('Admin xabarini yangilashda xato:', error.message);
             }
             
-            return finalizeOrder(
-                ctx,
-                { text },
-                `📍 Manzil: ${text}`
-            );
-        }
-        
-        return next();
-    });
-    
-    bot.action(/^status_(\d+)_(.+)$/, async (ctx) => {
-        const orderId = ctx.match[1];
-        const newStatus = ctx.match[2];
-        
-        const order = getOrderById(orderId);
-        if (!order) {
-            await ctx.answerCbQuery('Buyurtma topilmadi');
-            return;
-        }
-        
-        const updatedOrder = await updateOrderStatus(orderId, newStatus);
-        sendSseEvent('order_updated', updatedOrder);
-        
-        await ctx.answerCbQuery(`Status: ${newStatus}`);
-        
-        try {
-            const nextButtons = getButtonsByStatus(updatedOrder);
-            if (nextButtons) {
-                await ctx.editMessageText(buildAdminText(updatedOrder), nextButtons);
-            } else {
-                await ctx.editMessageText(buildAdminText(updatedOrder));
+            await syncAdminOrderMessage(updatedOrder);
+            
+            try {
+                await bot.telegram.sendMessage(
+                    updatedOrder.chatId,
+                    [
+                        '📦 Buyurtma holati yangilandi!',
+                        '',
+                        `🆔 Buyurtma ID: ${updatedOrder.id}`,
+                        `📌 Yangi status: ${updatedOrder.status}`
+                    ].join('\n'),
+                    mainKeyboard
+                );
+            } catch (error) {
+                console.log('Mijozga status yuborishda xato:', error.message);
             }
-        } catch (error) {
-            console.log('Admin xabarini yangilashda xato:', error.message);
-        }
-        
-        await syncAdminOrderMessage(updatedOrder);
-        
-        try {
-            await bot.telegram.sendMessage(
-                updatedOrder.chatId,
-                [
-                    '📦 Buyurtma holati yangilandi!',
-                    '',
-                    `🆔 Buyurtma ID: ${updatedOrder.id}`,
-                    `📌 Yangi status: ${updatedOrder.status}`
-                ].join('\n'),
-                mainKeyboard
-            );
-        } catch (error) {
-            console.log('Mijozga status yuborishda xato:', error.message);
-        }
-    });
-    
-    bot.hears('☎️ Aloqa', (ctx) => {
-        return ctx.reply(`☎️ Aloqa uchun: +998 90 123 45 67\n${getWorkHoursText()}`, mainKeyboard);
-    });
-    
-    /* API */
-    
-    app.get('/', (req, res) => {
-        res.send('Bot + API ishlayapti');
-    });
-    
-    app.get('/health', (req, res) => {
-        res.status(200).json({
-            ok: true,
-            service: 'telegram-bot-api',
-            time: new Date().toISOString(),
-            workStart: WORK_START,
-            workEnd: WORK_END,
-            currentTime: getCurrentTimeText(),
-            isOpen: isRestaurantOpen()
         });
-    });
-    
-    app.get('/api/stream', (req, res) => {
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache, no-transform');
-        res.setHeader('Connection', 'keep-alive');
-        res.flushHeaders?.();
         
-        res.write(`data: ${JSON.stringify({ type: 'connected', time: new Date().toISOString() })}\n\n`);
+        bot.hears('☎️ Aloqa', (ctx) => {
+            return ctx.reply(`☎️ Aloqa uchun: +998 90 123 45 67\n${getWorkHoursText()}`, mainKeyboard);
+        });
         
-        sseClients.add(res);
+        app.get('/', (req, res) => {
+            res.send('Bot + API ishlayapti');
+        });
         
-        const heartbeat = setInterval(() => {
-            try {
-                res.write(`: ping\n\n`);
-            } catch {
+        app.get('/health', (req, res) => {
+            res.status(200).json({
+                ok: true,
+                service: 'telegram-bot-api',
+                time: new Date().toISOString(),
+                workStart: WORK_START,
+                workEnd: WORK_END,
+                currentTime: getCurrentTimeText(),
+                isOpen: isRestaurantOpen()
+            });
+        });
+        
+        app.get('/api/stream', (req, res) => {
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache, no-transform');
+            res.setHeader('Connection', 'keep-alive');
+            res.flushHeaders?.();
+            
+            res.write(`data: ${JSON.stringify({ type: 'connected', time: new Date().toISOString() })}\n\n`);
+            
+            sseClients.add(res);
+            
+            const heartbeat = setInterval(() => {
+                try {
+                    res.write(`: ping\n\n`);
+                } catch {
+                    clearInterval(heartbeat);
+                }
+            }, 25000);
+            
+            req.on('close', () => {
                 clearInterval(heartbeat);
-            }
-        }, 25000);
-        
-        req.on('close', () => {
-            clearInterval(heartbeat);
-            sseClients.delete(res);
+                sseClients.delete(res);
+            });
         });
-    });
-    
-    app.get('/api/menu', async (req, res) => {
-        return res.json(getMenu());
-    });
-    
-    app.post('/api/menu', async (req, res) => {
-        const { key, name, price, category, image } = req.body;
         
-        if (!key || !name || !price || !category) {
-            return res.status(400).json({ error: 'key, name, price, category kerak' });
-        }
+        app.get('/api/menu', async (req, res) => {
+            return res.json(getMenu());
+        });
         
-        try {
-            await addMenuItem(key, name, Number(price), category, image || '');
-            const item = getMenuItem(normalizeKey(key));
-            sendSseEvent('menu_updated');
-            return res.json(item);
-        } catch (error) {
-            return res.status(400).json({ error: error.message });
-        }
-    });
-    
-    app.put('/api/menu/:key', async (req, res) => {
-        const key = normalizeKey(req.params.key);
-        const oldItem = getMenuItem(key);
-        
-        if (!oldItem) {
-            return res.status(404).json({ error: 'Mahsulot topilmadi' });
-        }
-        
-        try {
-            if (req.body.active !== undefined && Object.keys(req.body).length === 1) {
-                const item = await setMenuItemActive(key, Boolean(req.body.active));
+        app.post('/api/menu', async (req, res) => {
+            const { key, name, price, category, image } = req.body;
+            
+            if (!key || !name || !price || !category) {
+                return res.status(400).json({ error: 'key, name, price, category kerak' });
+            }
+            
+            try {
+                await addMenuItem(key, name, Number(price), category, image || '');
+                const item = getMenuItem(normalizeKey(key));
                 sendSseEvent('menu_updated');
                 return res.json(item);
+            } catch (error) {
+                return res.status(400).json({ error: error.message });
+            }
+        });
+        
+        app.put('/api/menu/:key', async (req, res) => {
+            const key = normalizeKey(req.params.key);
+            const oldItem = getMenuItem(key);
+            
+            if (!oldItem) {
+                return res.status(404).json({ error: 'Mahsulot topilmadi' });
             }
             
-            const name = req.body.name ?? oldItem.name;
-            const price = req.body.price !== undefined ? Number(req.body.price) : oldItem.price;
-            const category = req.body.category ?? oldItem.category;
-            const image = req.body.image !== undefined ? req.body.image : oldItem.image;
-            
-            await editMenuItem(key, name, price, category, image);
-            
-            if (req.body.active !== undefined) {
-                await setMenuItemActive(key, Boolean(req.body.active));
+            try {
+                if (req.body.active !== undefined && Object.keys(req.body).length === 1) {
+                    const item = await setMenuItemActive(key, Boolean(req.body.active));
+                    sendSseEvent('menu_updated');
+                    return res.json(item);
+                }
+                
+                const name = req.body.name ?? oldItem.name;
+                const price = req.body.price !== undefined ? Number(req.body.price) : oldItem.price;
+                const category = req.body.category ?? oldItem.category;
+                const image = req.body.image !== undefined ? req.body.image : oldItem.image;
+                
+                await editMenuItem(key, name, price, category, image);
+                
+                if (req.body.active !== undefined) {
+                    await setMenuItemActive(key, Boolean(req.body.active));
+                }
+                
+                sendSseEvent('menu_updated');
+                return res.json(getMenuItem(key));
+            } catch (error) {
+                return res.status(400).json({ error: error.message });
             }
-            
-            sendSseEvent('menu_updated');
-            return res.json(getMenuItem(key));
-        } catch (error) {
-            return res.status(400).json({ error: error.message });
-        }
-    });
-    
-    app.delete('/api/menu/:key', async (req, res) => {
-        const key = normalizeKey(req.params.key);
+        });
         
-        try {
-            const deleted = await deleteMenuItem(key);
-            sendSseEvent('menu_updated');
-            return res.json(deleted);
-        } catch (error) {
-            return res.status(404).json({ error: error.message });
-        }
-    });
-    
-    app.get('/api/orders', async (req, res) => {
-        return res.json(getAllOrders());
-    });
-    
-    app.put('/api/orders/:id/status', async (req, res) => {
-        const { status } = req.body;
-        const id = req.params.id;
+        app.delete('/api/menu/:key', async (req, res) => {
+            const key = normalizeKey(req.params.key);
+            
+            try {
+                const deleted = await deleteMenuItem(key);
+                sendSseEvent('menu_updated');
+                return res.json(deleted);
+            } catch (error) {
+                return res.status(404).json({ error: error.message });
+            }
+        });
         
-        try {
-            const updated = await updateOrderStatus(id, status);
-            sendSseEvent('order_updated', updated);
-            
-            await syncAdminOrderMessage(updated);
-            
-            await sendTelegramMessage(
-                updated.chatId,
-                [
-                    '📦 Buyurtma holati yangilandi!',
-                    '',
-                    `🆔 Buyurtma ID: ${updated.id}`,
-                    `📌 Yangi status: ${updated.status}`
-                ].join('\n')
-            );
-            
-            return res.json(updated);
-        } catch (error) {
-            return res.status(404).json({ error: error.message });
-        }
-    });
-    
-    app.put('/api/orders/:id/payment', async (req, res) => {
-        const id = req.params.id;
-        const { paymentMethod, paymentStatus, paidAt, clickTransactionId } = req.body;
+        app.get('/api/orders', async (req, res) => {
+            return res.json(getAllOrders());
+        });
         
-        try {
-            const updated = await updateOrderPayment(id, {
-                paymentMethod,
-                paymentStatus,
-                paidAt,
-                clickTransactionId
+        app.put('/api/orders/:id/status', async (req, res) => {
+            const { status } = req.body;
+            const id = req.params.id;
+            
+            try {
+                const updated = await updateOrderStatus(id, status);
+                sendSseEvent('order_updated', updated);
+                
+                if (updated.paymentStatus === 'paid') {
+                    clearPaymentTimer(id);
+                }
+                
+                await syncAdminOrderMessage(updated);
+                
+                await sendTelegramMessage(
+                    updated.chatId,
+                    [
+                        '📦 Buyurtma holati yangilandi!',
+                        '',
+                        `🆔 Buyurtma ID: ${updated.id}`,
+                        `📌 Yangi status: ${updated.status}`
+                    ].join('\n')
+                );
+                
+                return res.json(updated);
+            } catch (error) {
+                return res.status(404).json({ error: error.message });
+            }
+        });
+        
+        app.put('/api/orders/:id/payment', async (req, res) => {
+            const id = req.params.id;
+            const { paymentMethod, paymentStatus, paidAt, clickTransactionId } = req.body;
+            
+            try {
+                const updated = await updateOrderPayment(id, {
+                    paymentMethod,
+                    paymentStatus,
+                    paidAt,
+                    clickTransactionId
+                });
+                
+                if (updated.paymentStatus === 'paid') {
+                    clearPaymentTimer(id);
+                }
+                
+                sendSseEvent('order_updated', updated);
+                await syncAdminOrderMessage(updated);
+                
+                return res.json(updated);
+            } catch (error) {
+                return res.status(404).json({ error: error.message });
+            }
+        });
+        
+        app.delete('/api/orders/:id', async (req, res) => {
+            const id = req.params.id;
+            
+            try {
+                const order = getOrderById(id);
+                
+                if (!order) {
+                    return res.status(404).json({ error: 'Buyurtma topilmadi' });
+                }
+                
+                clearPaymentTimer(id);
+                await deleteOrder(id);
+                sendSseEvent('order_deleted', { id });
+                
+                return res.json({ success: true });
+            } catch (error) {
+                return res.status(500).json({ error: error.message });
+            }
+        });
+        
+        app.get('/api/stats', async (req, res) => {
+            const orders = getAllOrders();
+            
+            const totalOrders = orders.length;
+            const newOrders = orders.filter((o) => o.status === 'Yangi buyurtma').length;
+            const acceptedOrders = orders.filter((o) => o.status === 'Qabul qilindi').length;
+            const readyOrders = orders.filter((o) => o.status === 'Tayyor').length;
+            const deliveredOrders = orders.filter((o) => o.status === 'Yetkazildi').length;
+            const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+            const cashRevenue = orders
+            .filter((o) => (o.paymentMethod || 'cash') === 'cash')
+            .reduce((sum, o) => sum + Number(o.total || 0), 0);
+            const clickRevenue = orders
+            .filter((o) => o.paymentMethod === 'click')
+            .reduce((sum, o) => sum + Number(o.total || 0), 0);
+            const paidOrders = orders.filter((o) => (o.paymentStatus || 'pending') === 'paid').length;
+            const pendingPaymentOrders = orders.filter((o) => (o.paymentStatus || 'pending') === 'pending').length;
+            
+            return res.json({
+                totalOrders,
+                newOrders,
+                acceptedOrders,
+                readyOrders,
+                deliveredOrders,
+                totalRevenue,
+                cashRevenue,
+                clickRevenue,
+                paidOrders,
+                pendingPaymentOrders
+            });
+        });
+        
+        bot.catch((err) => {
+            console.error('BOT ERROR:', err);
+        });
+        
+        async function startApp() {
+            await connectDb();
+            await initMenu();
+            await initOrders();
+            
+            app.listen(PORT, () => {
+                console.log(`🌐 Server ishladi: ${PORT}`);
             });
             
-            sendSseEvent('order_updated', updated);
-            await syncAdminOrderMessage(updated);
-            
-            return res.json(updated);
-        } catch (error) {
-            return res.status(404).json({ error: error.message });
-        }
-    });
-    
-    app.delete('/api/orders/:id', async (req, res) => {
-        const id = req.params.id;
-        
-        try {
-            const order = getOrderById(id);
-            
-            if (!order) {
-                return res.status(404).json({ error: 'Buyurtma topilmadi' });
+            try {
+                await bot.telegram.deleteWebhook();
+            } catch (error) {
+                console.log('Webhook o‘chirishda xato:', error.message);
             }
             
-            await deleteOrder(id);
-            sendSseEvent('order_deleted', { id });
-            
-            return res.json({ success: true });
-        } catch (error) {
-            return res.status(500).json({ error: error.message });
+            try {
+                await bot.launch();
+                console.log('✅ Bot ishga tushdi');
+                console.log('ADMIN_CHAT_ID:', ADMIN_CHAT_ID || 'yo‘q');
+                console.log('CLICK_PROVIDER_TOKEN:', CLICK_PROVIDER_TOKEN ? 'mavjud' : 'yo‘q');
+                console.log('WORK HOURS:', `${WORK_START} - ${WORK_END}`);
+                console.log('CURRENT TIME:', getCurrentTimeText());
+                console.log('IS OPEN:', isRestaurantOpen());
+            } catch (error) {
+                console.error('BOT LAUNCH ERROR:', error);
+            }
         }
-    });
-    
-    app.get('/api/stats', async (req, res) => {
-        const orders = getAllOrders();
         
-        const totalOrders = orders.length;
-        const newOrders = orders.filter((o) => o.status === 'Yangi buyurtma').length;
-        const acceptedOrders = orders.filter((o) => o.status === 'Qabul qilindi').length;
-        const readyOrders = orders.filter((o) => o.status === 'Tayyor').length;
-        const deliveredOrders = orders.filter((o) => o.status === 'Yetkazildi').length;
-        const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total || 0), 0);
-        const cashRevenue = orders
-        .filter((o) => (o.paymentMethod || 'cash') === 'cash')
-        .reduce((sum, o) => sum + Number(o.total || 0), 0);
-        const clickRevenue = orders
-        .filter((o) => o.paymentMethod === 'click')
-        .reduce((sum, o) => sum + Number(o.total || 0), 0);
-        const paidOrders = orders.filter((o) => (o.paymentStatus || 'pending') === 'paid').length;
-        const pendingPaymentOrders = orders.filter((o) => (o.paymentStatus || 'pending') === 'pending').length;
+        startApp();
         
-        return res.json({
-            totalOrders,
-            newOrders,
-            acceptedOrders,
-            readyOrders,
-            deliveredOrders,
-            totalRevenue,
-            cashRevenue,
-            clickRevenue,
-            paidOrders,
-            pendingPaymentOrders
-        });
-    });
-    
-    bot.catch((err) => {
-        console.error('BOT ERROR:', err);
-    });
-    
-    async function startApp() {
-        await connectDb();
-        await initMenu();
-        await initOrders();
-        
-        app.listen(PORT, () => {
-            console.log(`🌐 Server ishladi: ${PORT}`);
+        process.once('SIGINT', async () => {
+            try {
+                for (const timer of paymentTimers.values()) {
+                    clearTimeout(timer);
+                }
+                paymentTimers.clear();
+                await bot.stop('SIGINT');
+            } finally {
+                process.exit(0);
+            }
         });
         
-        try {
-            await bot.telegram.deleteWebhook();
-        } catch (error) {
-            console.log('Webhook o‘chirishda xato:', error.message);
-        }
-        
-        try {
-            await bot.launch();
-            console.log('✅ Bot ishga tushdi');
-            console.log('ADMIN_CHAT_ID:', ADMIN_CHAT_ID || 'yo‘q');
-            console.log('CLICK_PROVIDER_TOKEN:', CLICK_PROVIDER_TOKEN ? 'mavjud' : 'yo‘q');
-            console.log('WORK HOURS:', `${WORK_START} - ${WORK_END}`);
-            console.log('CURRENT TIME:', getCurrentTimeText());
-            console.log('IS OPEN:', isRestaurantOpen());
-        } catch (error) {
-            console.error('BOT LAUNCH ERROR:', error);
-        }
-    }
-    
-    startApp();
-    
-    process.once('SIGINT', async () => {
-        try {
-            await bot.stop('SIGINT');
-        } finally {
-            process.exit(0);
-        }
-    });
-    
-    process.once('SIGTERM', async () => {
-        try {
-            await bot.stop('SIGTERM');
-        } finally {
-            process.exit(0);
-        }
-    });
+        process.once('SIGTERM', async () => {
+            try {
+                for (const timer of paymentTimers.values()) {
+                    clearTimeout(timer);
+                }
+                paymentTimers.clear();
+                await bot.stop('SIGTERM');
+            } finally {
+                process.exit(0);
+            }
+        });
