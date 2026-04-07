@@ -30,6 +30,7 @@ import {
 } from './orders.js';
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
+const CLICK_PROVIDER_TOKEN = process.env.CLICK_PROVIDER_TOKEN || '';
 const ADMIN_CHAT_ID = String(process.env.ADMIN_CHAT_ID || '');
 const TIME_ZONE = 'Asia/Tashkent';
 const WORK_START = process.env.WORK_START || '09:00';
@@ -267,7 +268,7 @@ function buildAdminText(order) {
             '',
             order.cartText,
             `💰 Jami: ${formatPrice(order.total)}`,
-            ...(order.clickTransactionId ? [`🧾 Click Transaction: ${order.clickTransactionId}`] : []),
+            ...(order.clickTransactionId ? [`🧾 Click transaction: ${order.clickTransactionId}`] : []),
             ...(order.paidAt ? [`🕒 To‘langan vaqt: ${new Date(order.paidAt).toLocaleString('uz-UZ', { timeZone: TIME_ZONE })}`] : []),
             '',
             `🕒 Buyurtma vaqti: ${new Date(order.createdAt).toLocaleString('uz-UZ', { timeZone: TIME_ZONE })}`
@@ -414,6 +415,36 @@ function buildAdminText(order) {
         return ctx.reply(text, keyboard);
     }
     
+    async function sendClickInvoice(ctx, order) {
+        if (!CLICK_PROVIDER_TOKEN) {
+            throw new Error('CLICK_PROVIDER_TOKEN topilmadi');
+        }
+        
+        await ctx.replyWithInvoice({
+            title: `Buyurtma #${order.id}`,
+            description: [
+                `Buyurtma ID: ${order.id}`,
+                `Yetkazish turi: ${getDeliveryTypeText(order.deliveryType)}`,
+                `To‘lov: Click`
+            ].join('\n'),
+            payload: `order_${order.id}`,
+            provider_token: CLICK_PROVIDER_TOKEN,
+            currency: 'UZS',
+            prices: [
+                {
+                    label: `Buyurtma #${order.id}`,
+                    amount: Math.round(Number(order.total || 0) * 100)
+                }
+            ],
+            start_parameter: `click-order-${order.id}`,
+            need_name: false,
+            need_phone_number: false,
+            need_email: false,
+            need_shipping_address: false,
+            is_flexible: false
+        });
+    }
+    
     async function finalizeOrder(ctx, locationData, locationNoticeText) {
         clearUnavailableCartItems(ctx.session.cart);
         
@@ -429,7 +460,6 @@ function buildAdminText(order) {
         const orderId = generateOrderId();
         
         const selectedPaymentMethod = ctx.session.orderData.paymentMethod || 'cash';
-        const selectedPaymentStatus = selectedPaymentMethod === 'cash' ? 'pending' : 'pending';
         
         const order = {
             id: orderId,
@@ -438,7 +468,7 @@ function buildAdminText(order) {
             username: ctx.session.orderData.username,
             deliveryType: ctx.session.orderData.deliveryType || 'delivery',
             paymentMethod: selectedPaymentMethod,
-            paymentStatus: selectedPaymentStatus,
+            paymentStatus: 'pending',
             paidAt: null,
             clickTransactionId: null,
             telegramName: [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || 'Noma’lum',
@@ -458,17 +488,12 @@ function buildAdminText(order) {
         await addOrder(order);
         sendSseEvent('order_created', order);
         
-        const paymentExtraText =
-        order.paymentMethod === 'click'
-        ? "💳 Click tanlandi\n⏳ Hozircha test rejimida. Keyingi bosqichda real Click link ulanadi."
-        : "💵 To‘lov turi: Naqd";
-        
         const userText = [
-            '✅ Buyurtma qabul qilindi!',
+            '✅ Buyurtma yaratildi!',
             '',
             `🆔 Buyurtma ID: ${order.id}`,
             `🚚 Yetkazish turi: ${getDeliveryTypeText(order.deliveryType)}`,
-            paymentExtraText,
+            `💳 To‘lov turi: ${getPaymentMethodText(order.paymentMethod)}`,
             `💰 To‘lov holati: ${getPaymentStatusText(order.paymentStatus)}`,
             `👤 Ism: ${order.name}`,
             `📞 Telefon: ${order.phone}`,
@@ -518,7 +543,18 @@ function buildAdminText(order) {
         ctx.session.orderData = {};
         ctx.session.currentCategory = null;
         
-        return ctx.reply(userText, mainKeyboard);
+        await ctx.reply(userText, mainKeyboard);
+        
+        if (order.paymentMethod === 'click') {
+            try {
+                await sendClickInvoice(ctx, order);
+            } catch (error) {
+                console.log('Click invoice yuborishda xato:', error.message);
+                await ctx.reply("❌ Click invoice yuborilmadi. Provider tokenni tekshiring.");
+            }
+        }
+        
+        return;
     }
     
     async function sendTelegramMessage(chatId, text) {
@@ -549,6 +585,56 @@ function buildAdminText(order) {
         ctx.session.currentCategory = null;
         
         return ctx.reply('Assalomu alaykum! Restoran botga xush kelibsiz.', mainKeyboard);
+    });
+    
+    bot.on('pre_checkout_query', async (ctx) => {
+        try {
+            await ctx.answerPreCheckoutQuery(true);
+        } catch (error) {
+            console.log('Pre-checkout xato:', error.message);
+        }
+    });
+    
+    bot.on('successful_payment', async (ctx) => {
+        try {
+            const payload = ctx.message.successful_payment?.invoice_payload || '';
+            const telegramChargeId = ctx.message.successful_payment?.telegram_payment_charge_id || null;
+            const providerChargeId = ctx.message.successful_payment?.provider_payment_charge_id || null;
+            
+            if (!payload.startsWith('order_')) {
+                return ctx.reply('To‘lov qabul qilindi.');
+            }
+            
+            const orderId = payload.replace('order_', '');
+            const order = getOrderById(orderId);
+            
+            if (!order) {
+                return ctx.reply('To‘lov qabul qilindi, lekin buyurtma topilmadi.');
+            }
+            
+            const updated = await updateOrderPayment(orderId, {
+                paymentMethod: 'click',
+                paymentStatus: 'paid',
+                paidAt: new Date().toISOString(),
+                clickTransactionId: providerChargeId || telegramChargeId || null
+            });
+            
+            sendSseEvent('order_updated', updated);
+            await syncAdminOrderMessage(updated);
+            
+            await ctx.reply(
+                [
+                    '✅ Click to‘lovi muvaffaqiyatli qabul qilindi!',
+                    '',
+                    `🆔 Buyurtma ID: ${updated.id}`,
+                    `💳 To‘lov turi: ${getPaymentMethodText(updated.paymentMethod)}`,
+                    `💰 To‘lov holati: ${getPaymentStatusText(updated.paymentStatus)}`
+                ].join('\n'),
+                mainKeyboard
+            );
+        } catch (error) {
+            console.log('Successful payment xato:', error.message);
+        }
     });
     
     bot.command('list', async (ctx) => {
@@ -876,6 +962,10 @@ function buildAdminText(order) {
     
     bot.hears('💳 Click', (ctx) => {
         if (ctx.session.step !== 'payment_method') return;
+        
+        if (!CLICK_PROVIDER_TOKEN) {
+            return ctx.reply("❌ Click token topilmadi. Admin bilan bog‘laning.");
+        }
         
         ctx.session.orderData.paymentMethod = 'click';
         ctx.session.step = 'phone';
