@@ -428,12 +428,19 @@ function buildAdminText(order) {
         const cartText = getCartText(ctx.session.cart);
         const orderId = generateOrderId();
         
+        const selectedPaymentMethod = ctx.session.orderData.paymentMethod || 'cash';
+        const selectedPaymentStatus = selectedPaymentMethod === 'cash' ? 'pending' : 'pending';
+        
         const order = {
             id: orderId,
             name: ctx.session.orderData.name,
             phone: ctx.session.orderData.phone,
             username: ctx.session.orderData.username,
             deliveryType: ctx.session.orderData.deliveryType || 'delivery',
+            paymentMethod: selectedPaymentMethod,
+            paymentStatus: selectedPaymentStatus,
+            paidAt: null,
+            clickTransactionId: null,
             telegramName: [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim() || 'Noma’lum',
             userId: ctx.from.id,
             chatId: ctx.chat.id,
@@ -442,10 +449,6 @@ function buildAdminText(order) {
             cartText,
             total,
             status: 'Yangi buyurtma',
-            paymentMethod: 'cash',
-            paymentStatus: 'pending',
-            paidAt: null,
-            clickTransactionId: null,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             adminMessageId: null,
@@ -455,12 +458,17 @@ function buildAdminText(order) {
         await addOrder(order);
         sendSseEvent('order_created', order);
         
+        const paymentExtraText =
+        order.paymentMethod === 'click'
+        ? "💳 Click tanlandi\n⏳ Hozircha test rejimida. Keyingi bosqichda real Click link ulanadi."
+        : "💵 To‘lov turi: Naqd";
+        
         const userText = [
             '✅ Buyurtma qabul qilindi!',
             '',
             `🆔 Buyurtma ID: ${order.id}`,
             `🚚 Yetkazish turi: ${getDeliveryTypeText(order.deliveryType)}`,
-            `💳 To‘lov turi: ${getPaymentMethodText(order.paymentMethod)}`,
+            paymentExtraText,
             `💰 To‘lov holati: ${getPaymentStatusText(order.paymentStatus)}`,
             `👤 Ism: ${order.name}`,
             `📞 Telefon: ${order.phone}`,
@@ -805,7 +813,8 @@ function buildAdminText(order) {
         ctx.session.orderData = {
             name: fullName || 'Noma’lum',
             username: ctx.from.username || '',
-            deliveryType: null
+            deliveryType: null,
+            paymentMethod: null
         };
         
         ctx.session.step = 'delivery_type';
@@ -825,6 +834,36 @@ function buildAdminText(order) {
         if (ctx.session.step !== 'delivery_type') return;
         
         ctx.session.orderData.deliveryType = 'delivery';
+        ctx.session.step = 'payment_method';
+        
+        return ctx.reply(
+            "💳 To‘lov turini tanlang:",
+            Markup.keyboard([
+                ['💵 Naqd'],
+                ['💳 Click']
+            ]).resize().oneTime()
+        );
+    });
+    
+    bot.hears('📦 O‘zim olib ketaman', (ctx) => {
+        if (ctx.session.step !== 'delivery_type') return;
+        
+        ctx.session.orderData.deliveryType = 'pickup';
+        ctx.session.step = 'payment_method';
+        
+        return ctx.reply(
+            "💳 To‘lov turini tanlang:",
+            Markup.keyboard([
+                ['💵 Naqd'],
+                ['💳 Click']
+            ]).resize().oneTime()
+        );
+    });
+    
+    bot.hears('💵 Naqd', (ctx) => {
+        if (ctx.session.step !== 'payment_method') return;
+        
+        ctx.session.orderData.paymentMethod = 'cash';
         ctx.session.step = 'phone';
         
         return ctx.reply(
@@ -835,10 +874,10 @@ function buildAdminText(order) {
         );
     });
     
-    bot.hears('📦 O‘zim olib ketaman', (ctx) => {
-        if (ctx.session.step !== 'delivery_type') return;
+    bot.hears('💳 Click', (ctx) => {
+        if (ctx.session.step !== 'payment_method') return;
         
-        ctx.session.orderData.deliveryType = 'pickup';
+        ctx.session.orderData.paymentMethod = 'click';
         ctx.session.step = 'phone';
         
         return ctx.reply(
