@@ -540,19 +540,25 @@ function buildAdminText(order) {
     
     // User uchun chiroyli status xabari
     function buildUserStatusText(order) {
+        const isPickup = order.deliveryType === 'pickup';
+        
         const statusEmoji = {
             'Yangi buyurtma': '🆕',
             'Qabul qilindi': '✅',
-            'Tayyor': '👨‍🍳',
-            'Yetkazildi': '🚚',
+            'Tayyor': isPickup ? '🏪' : '👨‍🍳',
+            'Yetkazildi': isPickup ? '✅' : '🚚',
             'Bekor qilindi': '❌'
         };
         
         const statusMsg = {
             'Yangi buyurtma': "Buyurtmangiz qabul qilindi va ko'rib chiqilmoqda.",
             'Qabul qilindi': "Buyurtmangiz qabul qilindi! Tayyorlanishi boshlandi.",
-            'Tayyor': "Buyurtmangiz tayyor! Yetkazuvchi yo'lda.",
-            'Yetkazildi': "Buyurtmangiz yetkazildi! Ishtahaingiz chog' bo'lsin! 😊",
+            'Tayyor': isPickup
+            ? "Buyurtmangiz tayyor! Kelib olib ketishingiz mumkin. 🏪"
+            : "Buyurtmangiz tayyor! Yetkazuvchi yo'lda. 🚚",
+            'Yetkazildi': isPickup
+            ? "Buyurtmangiz berildi! Ishtahaingiz chog' bo'lsin! 😊"
+            : "Buyurtmangiz yetkazildi! Ishtahaingiz chog' bo'lsin! 😊",
             'Bekor qilindi': "Buyurtmangiz bekor qilindi."
         };
         
