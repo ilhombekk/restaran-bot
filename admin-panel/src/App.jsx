@@ -295,7 +295,12 @@ function Badge({ status }) {
   );
 }
 
-function PaymentBadge({ paymentStatus }) {
+function PaymentBadge({ paymentStatus, paymentMethod }) {
+  // Naqd + pending bo'lsa badge ko'rsatilmaydi
+  const isCash = !paymentMethod || paymentMethod === 'cash';
+  const isPending = !paymentStatus || paymentStatus === 'pending';
+  if (isCash && isPending) return null;
+  
   let bg = '#fef3c7';
   let color = '#b45309';
   let label = 'Kutilmoqda';
@@ -561,7 +566,7 @@ function PaymentInfoBox({ order }) {
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
       <Badge status={order.status} />
       <MethodBadge paymentMethod={order.paymentMethod} />
-      <PaymentBadge paymentStatus={order.paymentStatus} />
+      <PaymentBadge paymentStatus={order.paymentStatus} paymentMethod={order.paymentMethod} />
       </div>
       </div>
       
