@@ -1057,8 +1057,9 @@ function PaymentInfoBox({ order }) {
         
         const matchesPaymentStatus =
         paymentStatusFilter === 'all' ||
-        (paymentStatusFilter === 'paid' && (order.paymentStatus || 'pending') === 'paid') ||
-        (paymentStatusFilter === 'pending' && (order.paymentStatus || 'pending') === 'pending');
+        (paymentStatusFilter === 'paid' && order.paymentStatus === 'paid') ||
+        // Kutilmoqda — faqat Click + pending (naqd kutilmoqda emas)
+        (paymentStatusFilter === 'pending' && order.paymentMethod === 'click' && (order.paymentStatus || 'pending') === 'pending');
         
         return matchesSearch && matchesPayment && matchesPaymentStatus;
       });
