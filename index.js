@@ -235,42 +235,24 @@ function clearPaymentTimer(orderId) {
 // ADMIN GURUHDA TO'LOV TUGMALARI
 // Click pending bo'lsa — "To'landi" va "Bekor qilish" tugmalari
 // =============================================
-function getAdminPaymentButtons(order) {
-    if (order.paymentMethod !== 'click') return null;
-    if (order.paymentStatus === 'paid') return null;
-    if (order.status === 'Bekor qilindi' || order.status === 'Yetkazildi') return null;
-    
-    return [
-        [
-            Markup.button.callback("To'landi (Click)", `pay_confirm_${order.id}`),
-            Markup.button.callback("Bekor qilish", `pay_cancel_${order.id}`)
-        ]
-    ];
-}
-
+// Faqat status tugmalari — to'lov tugmalari yo'q
 function getButtonsByStatus(order) {
-    const paymentRows = getAdminPaymentButtons(order);
-    
     if (order.status === 'Yangi buyurtma') {
-        const rows = [[Markup.button.callback('Qabul qilindi', `status_${order.id}_Qabul qilindi`)]];
-        if (paymentRows) rows.push(...paymentRows);
-        return Markup.inlineKeyboard(rows);
+        return Markup.inlineKeyboard([
+            [Markup.button.callback('✅ Qabul qilindi', `status_${order.id}_Qabul qilindi`)]
+        ]);
     }
     
     if (order.status === 'Qabul qilindi') {
-        const rows = [[Markup.button.callback('Tayyor', `status_${order.id}_Tayyor`)]];
-        if (paymentRows) rows.push(...paymentRows);
-        return Markup.inlineKeyboard(rows);
+        return Markup.inlineKeyboard([
+            [Markup.button.callback('👨‍🍳 Tayyor', `status_${order.id}_Tayyor`)]
+        ]);
     }
     
     if (order.status === 'Tayyor') {
-        const rows = [[Markup.button.callback('Yetkazildi', `status_${order.id}_Yetkazildi`)]];
-        if (paymentRows) rows.push(...paymentRows);
-        return Markup.inlineKeyboard(rows);
-    }
-    
-    if (paymentRows) {
-        return Markup.inlineKeyboard(paymentRows);
+        return Markup.inlineKeyboard([
+            [Markup.button.callback('🚚 Yetkazildi', `status_${order.id}_Yetkazildi`)]
+        ]);
     }
     
     return undefined;
@@ -654,7 +636,9 @@ function buildAdminText(order) {
                 : ['', '💵 Yetkazib berishda naqd to\'laysiz.'])
             ].join('\n');
             
-            if (ADMIN_CHAT_ID) {
+            // Faqat "Yetkazib berish" buyurtmalari admin guruhga yuboriladi
+            // "O'zi olib ketadi" faqat admin panelda ko'rinadi
+            if (ADMIN_CHAT_ID && order.deliveryType !== 'pickup') {
                 try {
                     const adminMessage = await bot.telegram.sendMessage(
                         ADMIN_CHAT_ID,
@@ -685,6 +669,9 @@ function buildAdminText(order) {
                 } catch (error) {
                     console.log('Admin ga yuborishda xato:', error.message);
                 }
+            } else {
+                // O'zi olib ketadi — faqat SSE orqali admin panelga tushadi
+                sendSseEvent('order_updated', order);
             }
             
             ctx.session.cart = {};
@@ -770,130 +757,8 @@ function buildAdminText(order) {
         // =============================================
         // ADMIN: "To'landi (Click)" tugmasi bosilganda
         // =============================================
-        bot.action(/^pay_confirm_(\w+)$/, async (ctx) => {
-            if (!isAdminChat(ctx)) {
-                await ctx.answerCbQuery("Ruxsat yo'q");
-                return;
-            }
-            
-            const orderId = ctx.match[1];
-            const order = getOrderById(orderId);
-            
-            if (!order) {
-                await ctx.answerCbQuery('Buyurtma topilmadi');
-                return;
-            }
-            
-            if (order.paymentStatus === 'paid') {
-                await ctx.answerCbQuery("Allaqachon to'langan");
-                return;
-            }
-            
-            clearPaymentTimer(orderId);
-            
-            const updated = await updateOrderPayment(orderId, {
-                paymentMethod: 'click',
-                paymentStatus: 'paid',
-                paidAt: new Date().toISOString(),
-                clickTransactionId: null
-            });
-            
-            sendSseEvent('order_updated', updated);
-            
-            try {
-                const nextButtons = getButtonsByStatus(updated);
-                if (nextButtons) {
-                    await ctx.editMessageText(buildAdminText(updated), { reply_markup: nextButtons.reply_markup });
-                } else {
-                    await ctx.editMessageText(buildAdminText(updated));
-                }
-            } catch (error) {
-                console.log('Admin xabarini yangilashda xato:', error.message);
-            }
-            
-            await ctx.answerCbQuery("To'lov tasdiqlandi");
-            
-            try {
-                await bot.telegram.sendMessage(
-                    updated.chatId,
-                    [
-                        "✅ *To'lovingiz tasdiqlandi!*",
-                        '',
-                        '━━━━━━━━━━━━━━━━━━',
-                        `🆔 Buyurtma: *#${updated.id}*`,
-                        `💳 To'lov: ${getPaymentMethodText(updated.paymentMethod)}`,
-                        `✅ Holat: ${getPaymentStatusText(updated.paymentStatus)}`,
-                        '━━━━━━━━━━━━━━━━━━',
-                        '',
-                        "🚀 Buyurtmangiz tayyorlanmoqda!"
-                    ].join('\n'),
-                    { ...mainKeyboard, parse_mode: 'Markdown' }
-                );
-            } catch (error) {
-                console.log("Mijozga to'lov xabari yuborishda xato:", error.message);
-            }
-        });
-        
-        // =============================================
-        // ADMIN: "Bekor qilish" tugmasi bosilganda
-        // =============================================
-        bot.action(/^pay_cancel_(\w+)$/, async (ctx) => {
-            if (!isAdminChat(ctx)) {
-                await ctx.answerCbQuery("Ruxsat yo'q");
-                return;
-            }
-            
-            const orderId = ctx.match[1];
-            const order = getOrderById(orderId);
-            
-            if (!order) {
-                await ctx.answerCbQuery('Buyurtma topilmadi');
-                return;
-            }
-            
-            if (order.status === 'Bekor qilindi') {
-                await ctx.answerCbQuery('Allaqachon bekor qilingan');
-                return;
-            }
-            
-            clearPaymentTimer(orderId);
-            
-            // Status va to'lov holatini birga o'zgartirish
-            await updateOrderStatus(orderId, 'Bekor qilindi');
-            const updated = await updateOrderPayment(orderId, {
-                paymentStatus: 'failed',
-                paidAt: null
-            });
-            
-            sendSseEvent('order_updated', updated);
-            
-            try {
-                await ctx.editMessageText(buildAdminText(updated));
-            } catch (error) {
-                console.log('Admin xabarini yangilashda xato:', error.message);
-            }
-            
-            await ctx.answerCbQuery('Buyurtma bekor qilindi');
-            
-            try {
-                await bot.telegram.sendMessage(
-                    updated.chatId,
-                    [
-                        "❌ *Buyurtmangiz bekor qilindi!*",
-                        '',
-                        '━━━━━━━━━━━━━━━━━━',
-                        `🆔 Buyurtma: *#${updated.id}*`,
-                        '━━━━━━━━━━━━━━━━━━',
-                        '',
-                        "📞 Muammo bo'lsa admin bilan bog'laning.",
-                        "🔄 Qaytadan buyurtma berish uchun /start ni bosing."
-                    ].join('\n'),
-                    { ...mainKeyboard, parse_mode: 'Markdown' }
-                );
-            } catch (error) {
-                console.log('Mijozga bekor xabari yuborishda xato:', error.message);
-            }
-        });
+        // pay_confirm va pay_cancel olib tashlandi
+        // Admin guruhda faqat status tugmalari qoldi
         
         async function sendTelegramMessage(chatId, text) {
             if (!BOT_TOKEN || !chatId) return;
