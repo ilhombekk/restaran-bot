@@ -1160,11 +1160,12 @@ function buildAdminText(order) {
             const total = getCartTotal(ctx.session.cart);
             const text = getCartText(ctx.session.cart);
             
-            if (total === 0) return ctx.reply(text, { parse_mode: 'Markdown' });
+            if (total === 0) return ctx.reply(text);
             
+            const cartButtons = getCartButtons(ctx.session.cart);
             return ctx.reply(
                 `${text}\n💰 Jami: ${formatPrice(total)}`,
-                { ...getCartButtons(ctx.session.cart), parse_mode: 'Markdown' }
+                cartButtons
             );
         });
         
@@ -1175,11 +1176,12 @@ function buildAdminText(order) {
             const total = getCartTotal(ctx.session.cart);
             const text = getCartText(ctx.session.cart);
             
-            if (total === 0) return ctx.reply(text, { parse_mode: 'Markdown' });
+            if (total === 0) return ctx.reply(text);
             
+            const cartButtons = getCartButtons(ctx.session.cart);
             return ctx.reply(
                 `${text}\n💰 Jami: ${formatPrice(total)}`,
-                { ...getCartButtons(ctx.session.cart), parse_mode: 'Markdown' }
+                cartButtons
             );
         });
         
