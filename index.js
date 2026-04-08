@@ -141,9 +141,12 @@ function getWorkHoursText() {
 
 function getClosedText() {
     return [
-        'Hozir buyurtma qabul qilinmaydi.',
-        `Ish vaqti: ${getWorkHoursText()}`,
-        `Hozirgi vaqt: ${getCurrentTimeText()}`
+        '🔴 *Hozir buyurtma qabul qilinmaydi!*',
+        '',
+        `🕒 Ish vaqti: *${getWorkHoursText()}*`,
+        `⏰ Hozirgi vaqt: ${getCurrentTimeText()}`,
+        '',
+        "Ish vaqtida qaytib keling! 🙏"
     ].join('\n');
 }
 
@@ -177,11 +180,11 @@ function getCartTotal(cart) {
 
 function getCartText(cart) {
     const items = getCartItems(cart);
-    if (!items.length) return "Savat bo'sh.";
+    if (!items.length) return "🛒 Savatingiz bo'sh.\n\nMenyu bo'limidan mahsulot qo'shing!";
     
-    let text = 'Savat:\n\n';
+    let text = '🛒 *Savatingiz:*\n\n';
     for (const item of items) {
-        text += `${item.name} x ${item.qty} = ${formatPrice(item.total)}\n`;
+        text += `▪️ ${item.name} × ${item.qty} = *${formatPrice(item.total)}*\n`;
     }
     return text;
 }
@@ -191,12 +194,12 @@ function getCartButtons(cart) {
     if (total === 0) return undefined;
     
     const rows = [
-        [Markup.button.callback('Buyurtma berish', 'checkout')],
-        [Markup.button.callback('Savatni tozalash', 'clear_cart')]
+        [Markup.button.callback(`✅ Buyurtma berish — ${formatPrice(total)}`, 'checkout')],
+        [Markup.button.callback('🗑 Savatni tozalash', 'clear_cart')]
     ];
     
     if (getCategories({ activeOnly: true }).length) {
-        rows.push([Markup.button.callback('Kategoriyalarga qaytish', 'back_to_categories')]);
+        rows.push([Markup.button.callback('⬅️ Menyuga qaytish', 'back_to_categories')]);
     }
     
     return Markup.inlineKeyboard(rows);
@@ -373,23 +376,25 @@ function buildAdminText(order) {
         if (!categories.length) return undefined;
         
         const rows = categories.map((category) => [
-            Markup.button.callback(category, `cat_${encodeURIComponent(category)}`)
+            Markup.button.callback(`🍽 ${category}`, `cat_${encodeURIComponent(category)}`)
         ]);
         
-        rows.push([Markup.button.callback("Savatni ko'rish", 'open_cart')]);
+        rows.push([Markup.button.callback("🛒 Savatni ko'rish", 'open_cart')]);
         return Markup.inlineKeyboard(rows);
     }
     
     function getCategoryText() {
         const categories = getCategories({ activeOnly: true });
-        if (!categories.length) return "Hozircha aktiv mahsulot yo'q.";
+        if (!categories.length) return "😔 Hozircha aktiv mahsulot yo'q.";
         
         return [
-            'Kategoriyani tanlang:',
+            '🍽 *Menyumiz*',
             '',
-            ...categories.map((category, index) => `${index + 1}. ${category}`),
+            '👇 Kategoriyani tanlang:',
             '',
-            `Ish vaqti: ${getWorkHoursText()}`
+            ...categories.map((category, index) => `${index + 1}️⃣  ${category}`),
+            '',
+            `🕒 Ish vaqti: ${getWorkHoursText()}`
         ].join('\n');
     }
     
@@ -397,14 +402,19 @@ function buildAdminText(order) {
         const items = getItemsByCategory(category, { activeOnly: true });
         const total = getCartTotal(cart);
         
-        if (!items.length) return `${category} kategoriyasida mahsulot yo'q.`;
+        if (!items.length) return `😔 ${category} kategoriyasida hozircha mahsulot yo'q.`;
+        
+        const totalText = total > 0
+        ? `\n🛒 Savatingiz: ${formatPrice(total)}`
+        : '';
         
         return [
-            `Kategoriya: ${category}`,
+            `📂 *${category}*`,
             '',
-            ...items.map((item) => `${item.name} - ${formatPrice(item.price)}`),
+            ...items.map((item) => `🍔 *${item.name}*\n   💰 ${formatPrice(item.price)}`),
+            totalText,
             '',
-            `Savatdagi jami: ${formatPrice(total)}`
+            '➕ ➖ tugmalar orqali miqdorni o\'zgartiring'
         ].join('\n');
     }
     
@@ -424,8 +434,8 @@ function buildAdminText(order) {
             ]);
         }
         
-        rows.push([Markup.button.callback('Kategoriyalarga qaytish', 'back_to_categories')]);
-        rows.push([Markup.button.callback("Savatni ko'rish", 'open_cart')]);
+        rows.push([Markup.button.callback('⬅️ Kategoriyalarga qaytish', 'back_to_categories')]);
+        rows.push([Markup.button.callback("🛒 Savatni ko'rish", 'open_cart')]);
         
         return Markup.inlineKeyboard(rows);
     }
@@ -509,12 +519,16 @@ function buildAdminText(order) {
                 await bot.telegram.sendMessage(
                     updatedOrder.chatId,
                     [
-                        'Buyurtma bekor qilindi.',
+                        '❌ *Buyurtmangiz bekor qilindi!*',
                         '',
-                        `Buyurtma ID: ${updatedOrder.id}`,
-                        "Sabab: 10 daqiqa ichida Click to'lovi amalga oshirilmadi."
+                        '━━━━━━━━━━━━━━━━━━',
+                        `🆔 Buyurtma: *#${updatedOrder.id}*`,
+                        "⏰ Sabab: 10 daqiqa ichida Click to'lovi amalga oshirilmadi.",
+                        '━━━━━━━━━━━━━━━━━━',
+                        '',
+                        "🔄 Qaytadan buyurtma berish uchun /start ni bosing."
                     ].join('\n'),
-                    mainKeyboard
+                    { ...mainKeyboard, parse_mode: 'Markdown' }
                 );
             } catch (error) {
                 console.log('Mijozga cancel xabari yuborishda xato:', error.message);
@@ -536,6 +550,39 @@ function buildAdminText(order) {
         paymentTimers.set(String(orderId), timer);
     }
     
+    // User uchun chiroyli status xabari
+    function buildUserStatusText(order) {
+        const statusEmoji = {
+            'Yangi buyurtma': '🆕',
+            'Qabul qilindi': '✅',
+            'Tayyor': '👨‍🍳',
+            'Yetkazildi': '🚚',
+            'Bekor qilindi': '❌'
+        };
+        
+        const statusMsg = {
+            'Yangi buyurtma': "Buyurtmangiz qabul qilindi va ko'rib chiqilmoqda.",
+            'Qabul qilindi': "Buyurtmangiz qabul qilindi! Tayyorlanishi boshlandi.",
+            'Tayyor': "Buyurtmangiz tayyor! Yetkazuvchi yo'lda.",
+            'Yetkazildi': "Buyurtmangiz yetkazildi! Ishtahaingiz chog' bo'lsin! 😊",
+            'Bekor qilindi': "Buyurtmangiz bekor qilindi."
+        };
+        
+        const emoji = statusEmoji[order.status] || '📦';
+        const msg = statusMsg[order.status] || `Holat: ${order.status}`;
+        
+        return [
+            `${emoji} *Buyurtma holati yangilandi!*`,
+            '',
+            '━━━━━━━━━━━━━━━━━━',
+            `🆔 Buyurtma: *#${order.id}*`,
+            `📌 Yangi holat: *${order.status}*`,
+            '━━━━━━━━━━━━━━━━━━',
+            '',
+            msg
+        ].join('\n');
+    }
+    
     async function finalizeOrder(ctx, locationData, locationNoticeText) {
         clearUnavailableCartItems(ctx.session.cart);
         
@@ -544,7 +591,7 @@ function buildAdminText(order) {
             ctx.session.step = null;
             ctx.session.orderData = {};
             ctx.session.currentCategory = null;
-            return ctx.reply("Savat bo'sh bo'lib qoldi.", mainKeyboard);
+            return ctx.reply("🛒 Savatingiz bo'sh bo'lib qoldi.\n\nMenyu bo'limidan mahsulot tanlang!", { ...mainKeyboard, parse_mode: 'Markdown' });
         }
         
         const cartText = getCartText(ctx.session.cart);
@@ -579,23 +626,26 @@ function buildAdminText(order) {
         sendSseEvent('order_created', order);
         
         const userText = [
-            'Buyurtma yaratildi!',
+            '✅ *Buyurtmangiz qabul qilindi!*',
             '',
-            `Buyurtma ID: ${order.id}`,
-            `Yetkazish turi: ${getDeliveryTypeText(order.deliveryType)}`,
-            `To'lov turi: ${getPaymentMethodText(order.paymentMethod)}`,
-            `To'lov holati: ${getPaymentStatusText(order.paymentStatus)}`,
-            `Ism: ${order.name}`,
-            `Telefon: ${order.phone}`,
-            locationNoticeText,
+            '━━━━━━━━━━━━━━━━━━',
+            `🆔 Buyurtma raqami: *#${order.id}*`,
+            `📦 Yetkazish: ${getDeliveryTypeText(order.deliveryType)}`,
+            `💳 To'lov: ${getPaymentMethodText(order.paymentMethod)}`,
+            `👤 Ism: ${order.name}`,
+            `📞 Telefon: ${order.phone}`,
+            `📍 ${locationNoticeText}`,
+            '━━━━━━━━━━━━━━━━━━',
             '',
             order.cartText,
-            `Jami: ${formatPrice(order.total)}`,
             '',
-            `Holat: ${order.status}`,
+            `💰 *Jami: ${formatPrice(order.total)}*`,
+            '',
+            '━━━━━━━━━━━━━━━━━━',
+            `📌 Holat: ${order.status}`,
             ...(order.paymentMethod === 'click'
-                ? ['', "Click to'lovi uchun 10 daqiqa vaqt beriladi.", "Agar vaqtida to'lov qilinmasa buyurtma avtomatik bekor bo'ladi."]
-                : [])
+                ? ['', '⏳ *Click orqali to\'lov:*', "To'lov uchun 10 daqiqa vaqtingiz bor.", "⚠️ Vaqtida to'lov qilinmasa buyurtma bekor bo'ladi!"]
+                : ['', '💵 Yetkazib berishda naqd to\'laysiz.'])
             ].join('\n');
             
             if (ADMIN_CHAT_ID) {
@@ -636,7 +686,7 @@ function buildAdminText(order) {
             ctx.session.orderData = {};
             ctx.session.currentCategory = null;
             
-            await ctx.reply(userText, mainKeyboard);
+            await ctx.reply(userText, { ...mainKeyboard, parse_mode: 'Markdown' });
             
             if (order.paymentMethod === 'click') {
                 try {
@@ -694,13 +744,17 @@ function buildAdminText(order) {
                 
                 await ctx.reply(
                     [
-                        "Click to'lovi muvaffaqiyatli qabul qilindi!",
+                        "✅ *Click to'lovi muvaffaqiyatli qabul qilindi!*",
                         '',
-                        `Buyurtma ID: ${updated.id}`,
-                        `To'lov turi: ${getPaymentMethodText(updated.paymentMethod)}`,
-                        `To'lov holati: ${getPaymentStatusText(updated.paymentStatus)}`
+                        '━━━━━━━━━━━━━━━━━━',
+                        `🆔 Buyurtma: *#${updated.id}*`,
+                        `💳 To'lov: ${getPaymentMethodText(updated.paymentMethod)}`,
+                        `✅ Holat: ${getPaymentStatusText(updated.paymentStatus)}`,
+                        '━━━━━━━━━━━━━━━━━━',
+                        '',
+                        "🚀 Buyurtmangiz tayyorlanmoqda!"
                     ].join('\n'),
-                    mainKeyboard
+                    { ...mainKeyboard, parse_mode: 'Markdown' }
                 );
             } catch (error) {
                 console.log('Successful payment xato:', error.message);
@@ -757,13 +811,17 @@ function buildAdminText(order) {
                 await bot.telegram.sendMessage(
                     updated.chatId,
                     [
-                        "To'lovingiz tasdiqlandi!",
+                        "✅ *To'lovingiz tasdiqlandi!*",
                         '',
-                        `Buyurtma ID: ${updated.id}`,
-                        `To'lov turi: ${getPaymentMethodText(updated.paymentMethod)}`,
-                        `To'lov holati: ${getPaymentStatusText(updated.paymentStatus)}`
+                        '━━━━━━━━━━━━━━━━━━',
+                        `🆔 Buyurtma: *#${updated.id}*`,
+                        `💳 To'lov: ${getPaymentMethodText(updated.paymentMethod)}`,
+                        `✅ Holat: ${getPaymentStatusText(updated.paymentStatus)}`,
+                        '━━━━━━━━━━━━━━━━━━',
+                        '',
+                        "🚀 Buyurtmangiz tayyorlanmoqda!"
                     ].join('\n'),
-                    mainKeyboard
+                    { ...mainKeyboard, parse_mode: 'Markdown' }
                 );
             } catch (error) {
                 console.log("Mijozga to'lov xabari yuborishda xato:", error.message);
@@ -815,12 +873,16 @@ function buildAdminText(order) {
                 await bot.telegram.sendMessage(
                     updated.chatId,
                     [
-                        'Buyurtmangiz bekor qilindi.',
+                        "❌ *Buyurtmangiz bekor qilindi!*",
                         '',
-                        `Buyurtma ID: ${updated.id}`,
-                        "Muammo bo'lsa admin bilan bog'laning."
+                        '━━━━━━━━━━━━━━━━━━',
+                        `🆔 Buyurtma: *#${updated.id}*`,
+                        '━━━━━━━━━━━━━━━━━━',
+                        '',
+                        "📞 Muammo bo'lsa admin bilan bog'laning.",
+                        "🔄 Qaytadan buyurtma berish uchun /start ni bosing."
                     ].join('\n'),
-                    mainKeyboard
+                    { ...mainKeyboard, parse_mode: 'Markdown' }
                 );
             } catch (error) {
                 console.log('Mijozga bekor xabari yuborishda xato:', error.message);
@@ -856,7 +918,16 @@ function buildAdminText(order) {
             ctx.session.orderData = {};
             ctx.session.currentCategory = null;
             
-            return ctx.reply('Assalomu alaykum! Restoran botga xush kelibsiz.', mainKeyboard);
+            return ctx.reply(
+                [
+                    '🍔 *Ajabo Burger*ga xush kelibsiz!',
+                    '',
+                    '🌟 Mazali burgerlar va tez yetkazib berish!',
+                    '',
+                    '👇 Quyidagi tugmalardan birini tanlang:'
+                ].join('\n'),
+                { ...mainKeyboard, parse_mode: 'Markdown' }
+            );
         });
         
         bot.command('list', async (ctx) => {
@@ -1083,9 +1154,12 @@ function buildAdminText(order) {
             const total = getCartTotal(ctx.session.cart);
             const text = getCartText(ctx.session.cart);
             
-            if (total === 0) return ctx.reply(text);
+            if (total === 0) return ctx.reply(text, { parse_mode: 'Markdown' });
             
-            return ctx.reply(`${text}\nJami: ${formatPrice(total)}`, getCartButtons(ctx.session.cart));
+            return ctx.reply(
+                `${text}\n💰 *Jami: ${formatPrice(total)}*`,
+                { ...getCartButtons(ctx.session.cart), parse_mode: 'Markdown' }
+            );
         });
         
         bot.action('open_cart', async (ctx) => {
@@ -1095,15 +1169,18 @@ function buildAdminText(order) {
             const total = getCartTotal(ctx.session.cart);
             const text = getCartText(ctx.session.cart);
             
-            if (total === 0) return ctx.reply(text);
+            if (total === 0) return ctx.reply(text, { parse_mode: 'Markdown' });
             
-            return ctx.reply(`${text}\nJami: ${formatPrice(total)}`, getCartButtons(ctx.session.cart));
+            return ctx.reply(
+                `${text}\n💰 *Jami: ${formatPrice(total)}*`,
+                { ...getCartButtons(ctx.session.cart), parse_mode: 'Markdown' }
+            );
         });
         
         bot.action('clear_cart', async (ctx) => {
             ctx.session.cart = {};
             await ctx.answerCbQuery('Savat tozalandi');
-            return ctx.reply('Savat tozalandi.', mainKeyboard);
+            return ctx.reply('🗑 Savat tozalandi.\n\nYangi buyurtma berish uchun menyuni oching!', mainKeyboard);
         });
         
         bot.action('checkout', async (ctx) => {
@@ -1118,7 +1195,7 @@ function buildAdminText(order) {
             
             if (!isRestaurantOpen()) {
                 await ctx.answerCbQuery('Hozir yopiqmiz');
-                return ctx.reply(getClosedText(), mainKeyboard);
+                return ctx.reply(getClosedText(), { ...mainKeyboard, parse_mode: 'Markdown' });
             }
             
             const fullName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(' ').trim();
@@ -1135,11 +1212,18 @@ function buildAdminText(order) {
             await ctx.answerCbQuery();
             
             return ctx.reply(
-                "Buyurtma qanday bo'ladi?",
-                Markup.keyboard([
-                    ['🚚 Yetkazib berish'],
-                    ["📦 O'zim olib ketaman"]
-                ]).resize().oneTime()
+                [
+                    '🚀 *Buyurtmani rasmiylashtirish*',
+                    '',
+                    "📦 Buyurtmani qanday olishni tanlang:"
+                ].join('\n'),
+                {
+                    ...Markup.keyboard([
+                        ['🚚 Yetkazib berish'],
+                        ["📦 O'zim olib ketaman"]
+                    ]).resize().oneTime(),
+                    parse_mode: 'Markdown'
+                }
             );
         });
         
@@ -1150,11 +1234,19 @@ function buildAdminText(order) {
             ctx.session.step = 'payment_method';
             
             return ctx.reply(
-                "To'lov turini tanlang:",
-                Markup.keyboard([
-                    ['💵 Naqd'],
-                    ['💳 Click']
-                ]).resize().oneTime()
+                [
+                    "💳 *To'lov usulini tanlang:*",
+                    '',
+                    "💵 *Naqd* — Yetkazib berishda to'laysiz",
+                    "💳 *Click* — Hoziroq onlayn to'lang"
+                ].join('\n'),
+                {
+                    ...Markup.keyboard([
+                        ['💵 Naqd'],
+                        ['💳 Click']
+                    ]).resize().oneTime(),
+                    parse_mode: 'Markdown'
+                }
             );
         });
         
@@ -1165,11 +1257,19 @@ function buildAdminText(order) {
             ctx.session.step = 'payment_method';
             
             return ctx.reply(
-                "To'lov turini tanlang:",
-                Markup.keyboard([
-                    ['💵 Naqd'],
-                    ['💳 Click']
-                ]).resize().oneTime()
+                [
+                    "💳 *To'lov usulini tanlang:*",
+                    '',
+                    "💵 *Naqd* — Olib ketishda to'laysiz",
+                    "💳 *Click* — Hoziroq onlayn to'lang"
+                ].join('\n'),
+                {
+                    ...Markup.keyboard([
+                        ['💵 Naqd'],
+                        ['💳 Click']
+                    ]).resize().oneTime(),
+                    parse_mode: 'Markdown'
+                }
             );
         });
         
@@ -1180,10 +1280,17 @@ function buildAdminText(order) {
             ctx.session.step = 'phone';
             
             return ctx.reply(
-                'Telefon raqamingizni yuboring:',
-                Markup.keyboard([
-                    [Markup.button.contactRequest('Telefon yuborish')]
-                ]).resize().oneTime()
+                [
+                    '📱 *Telefon raqamingizni yuboring*',
+                    '',
+                    "Quyidagi tugmani bosing yoki raqamni qo'lda kiriting:"
+                ].join('\n'),
+                {
+                    ...Markup.keyboard([
+                        [Markup.button.contactRequest('📱 Telefon raqamni yuborish')]
+                    ]).resize().oneTime(),
+                    parse_mode: 'Markdown'
+                }
             );
         });
         
@@ -1198,10 +1305,17 @@ function buildAdminText(order) {
             ctx.session.step = 'phone';
             
             return ctx.reply(
-                'Telefon raqamingizni yuboring:',
-                Markup.keyboard([
-                    [Markup.button.contactRequest('Telefon yuborish')]
-                ]).resize().oneTime()
+                [
+                    '📱 *Telefon raqamingizni yuboring*',
+                    '',
+                    "Quyidagi tugmani bosing yoki raqamni qo'lda kiriting:"
+                ].join('\n'),
+                {
+                    ...Markup.keyboard([
+                        [Markup.button.contactRequest('📱 Telefon raqamni yuborish')]
+                    ]).resize().oneTime(),
+                    parse_mode: 'Markdown'
+                }
             );
         });
         
@@ -1221,17 +1335,34 @@ function buildAdminText(order) {
             ctx.session.step = 'address';
             
             return ctx.reply(
-                "Manzilni yuboring.\n\n1) Qo'lda yozsangiz bo'ladi\n2) Yoki lokatsiya yuborsangiz bo'ladi",
-                Markup.keyboard([
-                    [Markup.button.locationRequest('Lokatsiya yuborish')],
-                    ["Manzilni yozaman"]
-                ]).resize()
+                [
+                    '📍 *Yetkazib berish manzili*',
+                    '',
+                    "Quyidagi usullardan birini tanlang:",
+                    '',
+                    "📍 *Lokatsiya* — Aniq joylashuvingizni yuboring",
+                    "✏️ *Manzilni yozish* — Qo'lda kiriting"
+                ].join('\n'),
+                {
+                    ...Markup.keyboard([
+                        [Markup.button.locationRequest('📍 Lokatsiya yuborish')],
+                        ["✏️ Manzilni yozaman"]
+                    ]).resize(),
+                    parse_mode: 'Markdown'
+                }
             );
         });
         
-        bot.hears("Manzilni yozaman", (ctx) => {
+        bot.hears("✏️ Manzilni yozaman", (ctx) => {
             if (ctx.session.step !== 'address') return;
-            return ctx.reply("Manzilni yozib yuboring:\n\nMasalan: Toshkent, Chilonzor, 12-uy");
+            return ctx.reply(
+                [
+                    '✏️ *Manzilingizni yozing:*',
+                    '',
+                    "Masalan: Toshkent sh., Chilonzor tumani, Bunyodkor ko'chasi 12-uy"
+                ].join('\n'),
+                { parse_mode: 'Markdown' }
+            );
         });
         
         bot.on('location', async (ctx) => {
@@ -1254,8 +1385,8 @@ function buildAdminText(order) {
             const text = (ctx.message.text || '').trim();
             
             if (ctx.session.step === 'address') {
-                if (!text || text.length < 5 || text === "Manzilni yozaman") {
-                    return ctx.reply("Iltimos, manzilni to'liqroq yozing.");
+                if (!text || text.length < 5 || text === "✏️ Manzilni yozaman") {
+                    return ctx.reply("⚠️ Iltimos, manzilni to'liqroq yozing.\n\nMasalan: Toshkent, Chilonzor, 12-uy");
                 }
                 
                 return finalizeOrder(
@@ -1299,13 +1430,8 @@ function buildAdminText(order) {
             try {
                 await bot.telegram.sendMessage(
                     updatedOrder.chatId,
-                    [
-                        'Buyurtma holati yangilandi!',
-                        '',
-                        `Buyurtma ID: ${updatedOrder.id}`,
-                        `Yangi status: ${updatedOrder.status}`
-                    ].join('\n'),
-                    mainKeyboard
+                    buildUserStatusText(updatedOrder),
+                    { ...mainKeyboard, parse_mode: 'Markdown' }
                 );
             } catch (error) {
                 console.log('Mijozga status yuborishda xato:', error.message);
@@ -1313,7 +1439,21 @@ function buildAdminText(order) {
         });
         
         bot.hears('☎️ Aloqa', (ctx) => {
-            return ctx.reply(`Aloqa uchun: +998 90 123 45 67\nIsh vaqti: ${getWorkHoursText()}`, mainKeyboard);
+            return ctx.reply(
+                [
+                    '☎️ *Biz bilan bog\'laning*',
+                    '',
+                    '📞 Telefon: +998 90 123 45 67',
+                    '',
+                    `🕒 Ish vaqti: ${getWorkHoursText()}`,
+                    `⏰ Hozirgi vaqt: ${getCurrentTimeText()}`,
+                    '',
+                    isRestaurantOpen()
+                    ? '🟢 Hozir ochiq — Buyurtma berishingiz mumkin!'
+                    : '🔴 Hozir yopiq — Ish vaqtida keling!'
+                ].join('\n'),
+                { ...mainKeyboard, parse_mode: 'Markdown' }
+            );
         });
         
         // =============================================
@@ -1444,15 +1584,15 @@ function buildAdminText(order) {
                 
                 await syncAdminOrderMessage(updated);
                 
-                await sendTelegramMessage(
-                    updated.chatId,
-                    [
-                        'Buyurtma holati yangilandi!',
-                        '',
-                        `Buyurtma ID: ${updated.id}`,
-                        `Yangi status: ${updated.status}`
-                    ].join('\n')
-                );
+                try {
+                    await bot.telegram.sendMessage(
+                        updated.chatId,
+                        buildUserStatusText(updated),
+                        { parse_mode: 'Markdown' }
+                    );
+                } catch (e) {
+                    console.log('Status xabar yuborishda xato:', e.message);
+                }
                 
                 return res.json(updated);
             } catch (error) {
