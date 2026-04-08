@@ -1662,7 +1662,7 @@ function buildAdminText(order) {
             .filter((o) => o.paymentMethod === 'click')
             .reduce((sum, o) => sum + Number(o.total || 0), 0);
             const paidOrders = orders.filter((o) => (o.paymentStatus || 'pending') === 'paid').length;
-            const pendingPaymentOrders = orders.filter((o) => (o.paymentStatus || 'pending') === 'pending').length;
+            const pendingPaymentOrders = orders.filter((o) => o.paymentMethod === 'click' && (o.paymentStatus || 'pending') === 'pending').length;
             
             return res.json({
                 totalOrders,

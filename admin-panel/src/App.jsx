@@ -828,7 +828,7 @@ function PaymentInfoBox({ order }) {
     .filter((o) => o.paymentMethod === 'click')
     .reduce((sum, o) => sum + Number(o.total || 0), 0);
     const paidOrders = orders.filter((o) => (o.paymentStatus || 'pending') === 'paid').length;
-    const pendingPaymentOrders = orders.filter((o) => (o.paymentStatus || 'pending') === 'pending').length;
+    const pendingPaymentOrders = orders.filter((o) => o.paymentMethod === 'click' && (o.paymentStatus || 'pending') === 'pending').length;
     return {
       totalOrders,
       newOrders,
@@ -873,7 +873,7 @@ function PaymentInfoBox({ order }) {
       if ((order.paymentMethod || 'cash') === 'cash') item.cashRevenue += Number(order.total || 0);
       if (order.paymentMethod === 'click') item.clickRevenue += Number(order.total || 0);
       if ((order.paymentStatus || 'pending') === 'paid') item.paidOrders += 1;
-      if ((order.paymentStatus || 'pending') === 'pending') item.pendingPaymentOrders += 1;
+      if (order.paymentMethod === 'click' && (order.paymentStatus || 'pending') === 'pending') item.pendingPaymentOrders += 1;
       if (order.status === 'Yangi buyurtma') item.newOrders += 1;
       if (order.status === 'Qabul qilindi') item.acceptedOrders += 1;
       if (order.status === 'Tayyor') item.readyOrders += 1;
