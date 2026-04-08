@@ -182,9 +182,9 @@ function getCartText(cart) {
     const items = getCartItems(cart);
     if (!items.length) return "🛒 Savatingiz bo'sh.\n\nMenyu bo'limidan mahsulot qo'shing!";
     
-    let text = '🛒 *Savatingiz:*\n\n';
+    let text = '🛒 Savatingiz:\n\n';
     for (const item of items) {
-        text += `▪️ ${item.name} × ${item.qty} = *${formatPrice(item.total)}*\n`;
+        text += `▪️ ${item.name} × ${item.qty} = ${formatPrice(item.total)}\n`;
     }
     return text;
 }
@@ -388,11 +388,11 @@ function buildAdminText(order) {
         if (!categories.length) return "😔 Hozircha aktiv mahsulot yo'q.";
         
         return [
-            '🍽 *Menyumiz*',
+            '🍽 Menyumiz',
             '',
             '👇 Kategoriyani tanlang:',
             '',
-            ...categories.map((category, index) => `${index + 1}️⃣  ${category}`),
+            ...categories.map((category, index) => `${index + 1}. ${category}`),
             '',
             `🕒 Ish vaqti: ${getWorkHoursText()}`
         ].join('\n');
@@ -409,9 +409,13 @@ function buildAdminText(order) {
         : '';
         
         return [
-            `📂 *${category}*`,
+            `📂 ${category}`,
             '',
-            ...items.map((item) => `🍔 *${item.name}*\n   💰 ${formatPrice(item.price)}`),
+            ...items.map((item) => {
+                const qty = getQty(cart, item.key);
+                const qtyText = qty > 0 ? ` (${qty} ta)` : '';
+                return `🍔 ${item.name}${qtyText}\n   💰 ${formatPrice(item.price)}`;
+            }),
             totalText,
             '',
             '➕ ➖ tugmalar orqali miqdorni o\'zgartiring'
@@ -424,13 +428,15 @@ function buildAdminText(order) {
         
         for (const item of items) {
             rows.push([
-                Markup.button.callback(`${item.name} - ${formatPrice(item.price)}`, `view_${item.key}`)
+                Markup.button.callback(`🍔 ${item.name} — ${formatPrice(item.price)}`, `view_${item.key}`)
             ]);
             
+            const qty = getQty(cart, item.key);
+            const qtyLabel = qty > 0 ? `${qty} ta` : '0';
             rows.push([
-                Markup.button.callback('-', `minus_${item.key}`),
-                Markup.button.callback(`${item.name} (${getQty(cart, item.key)})`, 'ignore'),
-                Markup.button.callback('+', `add_${item.key}`)
+                Markup.button.callback('➖', `minus_${item.key}`),
+                Markup.button.callback(`🛒 ${qtyLabel}`, 'ignore'),
+                Markup.button.callback('➕', `add_${item.key}`)
             ]);
         }
         
@@ -1157,7 +1163,7 @@ function buildAdminText(order) {
             if (total === 0) return ctx.reply(text, { parse_mode: 'Markdown' });
             
             return ctx.reply(
-                `${text}\n💰 *Jami: ${formatPrice(total)}*`,
+                `${text}\n💰 Jami: ${formatPrice(total)}`,
                 { ...getCartButtons(ctx.session.cart), parse_mode: 'Markdown' }
             );
         });
@@ -1172,7 +1178,7 @@ function buildAdminText(order) {
             if (total === 0) return ctx.reply(text, { parse_mode: 'Markdown' });
             
             return ctx.reply(
-                `${text}\n💰 *Jami: ${formatPrice(total)}*`,
+                `${text}\n💰 Jami: ${formatPrice(total)}`,
                 { ...getCartButtons(ctx.session.cart), parse_mode: 'Markdown' }
             );
         });
