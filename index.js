@@ -1661,82 +1661,87 @@ function buildAdminText(order) {
             const clickRevenue = orders
             .filter((o) => o.paymentMethod === 'click')
             .reduce((sum, o) => sum + Number(o.total || 0), 0);
-            const paidOrders = orders.filter((o) => (o.paymentStatus || 'pending') === 'paid').length;
-            const pendingPaymentOrders = orders.filter((o) => o.paymentMethod === 'click' && (o.paymentStatus || 'pending') === 'pending').length;
-            
-            return res.json({
-                totalOrders,
-                newOrders,
-                acceptedOrders,
-                readyOrders,
-                deliveredOrders,
-                cancelledOrders,
-                totalRevenue,
-                cashRevenue,
-                clickRevenue,
-                paidOrders,
-                pendingPaymentOrders
-            });
+            const paidOrders = orders.filter((o) =>
+                o.status !== 'Bekor qilindi' && (
+                o.paymentStatus === 'paid' ||
+                (o.paymentMethod || 'cash') === 'cash'
+            )
+        ).length;
+        const pendingPaymentOrders = orders.filter((o) => o.paymentMethod === 'click' && (o.paymentStatus || 'pending') === 'pending').length;
+        
+        return res.json({
+            totalOrders,
+            newOrders,
+            acceptedOrders,
+            readyOrders,
+            deliveredOrders,
+            cancelledOrders,
+            totalRevenue,
+            cashRevenue,
+            clickRevenue,
+            paidOrders,
+            pendingPaymentOrders
+        });
+    });
+    
+    bot.catch((err) => {
+        console.error('BOT ERROR:', err);
+    });
+    
+    // =============================================
+    // START
+    // =============================================
+    
+    async function startApp() {
+        await connectDb();
+        await initMenu();
+        await initOrders();
+        
+        app.listen(PORT, () => {
+            console.log(`Server ishladi: ${PORT}`);
         });
         
-        bot.catch((err) => {
-            console.error('BOT ERROR:', err);
-        });
-        
-        // =============================================
-        // START
-        // =============================================
-        
-        async function startApp() {
-            await connectDb();
-            await initMenu();
-            await initOrders();
-            
-            app.listen(PORT, () => {
-                console.log(`Server ishladi: ${PORT}`);
-            });
-            
-            try {
-                await bot.telegram.deleteWebhook();
-            } catch (error) {
-                console.log("Webhook o'chirishda xato:", error.message);
-            }
-            
-            try {
-                await bot.launch();
-                console.log('Bot ishga tushdi');
-                console.log('ADMIN_CHAT_ID:', ADMIN_CHAT_ID || "yo'q");
-                console.log('CLICK_PROVIDER_TOKEN:', CLICK_PROVIDER_TOKEN ? 'mavjud' : "yo'q");
-                console.log('WORK HOURS:', `${WORK_START} - ${WORK_END}`);
-                console.log('CURRENT TIME:', getCurrentTimeText());
-                console.log('IS OPEN:', isRestaurantOpen());
-            } catch (error) {
-                console.error('BOT LAUNCH ERROR:', error);
-            }
+        try {
+            await bot.telegram.deleteWebhook();
+        } catch (error) {
+            console.log("Webhook o'chirishda xato:", error.message);
         }
         
-        startApp();
-        
-        process.once('SIGINT', async () => {
-            try {
-                for (const timer of paymentTimers.values()) {
-                    clearTimeout(timer);
-                }
-                paymentTimers.clear();
-                await bot.stop('SIGINT');
-            } finally {
-                process.exit(0);
+        try {
+            await bot.launch();
+            console.log('Bot ishga tushdi');
+            console.log('ADMIN_CHAT_ID:', ADMIN_CHAT_ID || "yo'q");
+            console.log('CLICK_PROVIDER_TOKEN:', CLICK_PROVIDER_TOKEN ? 'mavjud' : "yo'q");
+            console.log('WORK HOURS:', `${WORK_START} - ${WORK_END}`);
+            console.log('CURRENT TIME:', getCurrentTimeText());
+            console.log('IS OPEN:', isRestaurantOpen());
+        } catch (error) {
+            console.error('BOT LAUNCH ERROR:', error);
+        }
+    }
+    
+    startApp();
+    
+    process.once('SIGINT', async () => {
+        try {
+            for (const timer of paymentTimers.values()) {
+                clearTimeout(timer);
             }
-        });
-        
-        process.once('SIGTERM', async () => {
-            try {
-                for (const timer of paymentTimers.values()) {
-                    clearTimeout(timer);
-                }
-                paymentTimers.clear();
-                await bot.stop('SIGTERM');
-            } finally {
-                process.exit(0);
+            paymentTimers.clear();
+            await bot.stop('SIGINT');
+        } finally {
+            process.exit(0);
+        }
+    });
+    
+    process.once('SIGTERM', async () => {
+        try {
+            for (const timer of paymentTimers.values()) {
+                clearTimeout(timer);
             }
-        });
+            paymentTimers.clear();
+            await bot.stop('SIGTERM');
+        } finally {
+            process.exit(0);
+        }
+    });
