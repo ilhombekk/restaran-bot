@@ -1629,12 +1629,28 @@ export default function App() {
       >
       <div
       onClick={(e) => e.stopPropagation()}
-      style={{ width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', background: '#ffffff', borderRadius: 28, padding: isMobile ? 18 : 24, boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}
+      style={{
+        width: '100%',
+        maxWidth: 520,
+        maxHeight: '92vh',
+        display: 'flex',
+        flexDirection: 'column',
+        background: '#ffffff',
+        borderRadius: 28,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+        overflow: 'hidden',
+      }}
       >
-      <div style={{ fontSize: isMobile ? 22 : 26, fontWeight: 800, marginBottom: 18, color: '#0f172a' }}>
+      {/* Header - scroll bo'lmaydi */}
+      <div style={{ padding: isMobile ? '16px 18px 12px' : '22px 24px 14px', borderBottom: '1px solid #f1f5f9', flexShrink: 0 }}>
+      <div style={{ fontSize: isMobile ? 20 : 24, fontWeight: 800, color: '#0f172a' }}>
       {editingId ? 'Mahsulotni tahrirlash' : "Yangi mahsulot qo'shish"}
       </div>
-      <div style={{ display: 'grid', gap: 14 }}>
+      </div>
+      
+      {/* Kontent - scroll bo'ladi */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '14px 18px' : '16px 24px' }}>
+      <div style={{ display: 'grid', gap: 12 }}>
       <Input placeholder="ID / key" value={form.id} onChange={(e) => setForm((prev) => ({ ...prev, id: e.target.value }))} />
       <Input placeholder="Mahsulot nomi" value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} />
       <Input placeholder="Narxi" type="number" value={form.price} onChange={(e) => setForm((prev) => ({ ...prev, price: e.target.value }))} />
@@ -1664,13 +1680,16 @@ export default function App() {
         />
       )}
       {form.image ? (
-        <div style={{ border: '1px solid #e2e8f0', borderRadius: 18, padding: 12, background: '#f8fafc' }}>
-        <div style={{ fontSize: 13, color: '#64748b', marginBottom: 10 }}>Rasm preview</div>
-        <img src={form.image} alt="preview" style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 14, background: '#ffffff' }} />
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 10, background: '#f8fafc' }}>
+        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>Rasm preview</div>
+        <img src={form.image} alt="preview" style={{ width: '100%', maxHeight: 160, objectFit: 'contain', borderRadius: 10, background: '#ffffff' }} />
         </div>
       ) : null}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, flexDirection: isSmallMobile ? 'column' : 'row' }}>
+      </div>
+      
+      {/* Footer tugmalar - scroll bo'lmaydi */}
+      <div style={{ padding: isMobile ? '12px 18px 16px' : '14px 24px 20px', borderTop: '1px solid #f1f5f9', flexShrink: 0, display: 'flex', justifyContent: 'flex-end', gap: 10, flexDirection: isSmallMobile ? 'column' : 'row' }}>
       <Button onClick={() => setShowForm(false)} style={{ background: '#e2e8f0', color: '#0f172a', width: isSmallMobile ? '100%' : 'auto' }}>
       Bekor qilish
       </Button>
