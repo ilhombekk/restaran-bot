@@ -814,27 +814,32 @@ function PaymentInfoBox({ order }) {
   }
   
   function buildStatsFromOrders(orders) {
-    const totalOrders = orders.length;
-    const newOrders = orders.filter((o) => o.status === 'Yangi buyurtma').length;
-    const acceptedOrders = orders.filter((o) => o.status === 'Qabul qilindi').length;
-    const readyOrders = orders.filter((o) => o.status === 'Tayyor').length;
-    const deliveredOrders = orders.filter((o) => o.status === 'Yetkazildi').length;
-    const cancelledOrders = orders.filter((o) => o.status === 'Bekor qilindi').length;
-    const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total || 0), 0);
-    const cashRevenue = orders
+    // Faqat bugungi buyurtmalar
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayOrders = orders.filter((o) => o.createdAt && new Date(o.createdAt) >= todayStart);
+    
+    const totalOrders = todayOrders.length;
+    const newOrders = todayOrders.filter((o) => o.status === 'Yangi buyurtma').length;
+    const acceptedOrders = todayOrders.filter((o) => o.status === 'Qabul qilindi').length;
+    const readyOrders = todayOrders.filter((o) => o.status === 'Tayyor').length;
+    const deliveredOrders = todayOrders.filter((o) => o.status === 'Yetkazildi').length;
+    const cancelledOrders = todayOrders.filter((o) => o.status === 'Bekor qilindi').length;
+    const totalRevenue = todayOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+    const cashRevenue = todayOrders
     .filter((o) => (o.paymentMethod || 'cash') === 'cash')
     .reduce((sum, o) => sum + Number(o.total || 0), 0);
-    const clickRevenue = orders
+    const clickRevenue = todayOrders
     .filter((o) => o.paymentMethod === 'click')
     .reduce((sum, o) => sum + Number(o.total || 0), 0);
     // Naqd + bekor qilinmagan = to'langan; Click + paid = to'langan
-    const paidOrders = orders.filter((o) =>
+    const paidOrders = todayOrders.filter((o) =>
       o.status !== 'Bekor qilindi' && (
       o.paymentStatus === 'paid' ||
       (o.paymentMethod || 'cash') === 'cash'
     )
   ).length;
-  const pendingPaymentOrders = orders.filter((o) => o.paymentMethod === 'click' && (o.paymentStatus || 'pending') === 'pending').length;
+  const pendingPaymentOrders = todayOrders.filter((o) => o.paymentMethod === 'click' && (o.paymentStatus || 'pending') === 'pending').length;
   return {
     totalOrders,
     newOrders,
@@ -1376,10 +1381,10 @@ export default function App() {
     )}
     
     <div style={{ display: 'grid', gridTemplateColumns: topStatsGrid, gap: 16 }}>
-    <StatCard title="Jami buyurtmalar" value={statsData?.totalOrders ?? 0} icon={ShoppingBag} helper="Barcha buyurtmalar" />
-    <StatCard title="Yangi" value={statsData?.newOrders ?? 0} icon={Bell} helper="Yangi tushganlar" />
-    <StatCard title="Naqd tushum" value={formatPrice(statsData?.cashRevenue ?? 0)} icon={Banknote} helper="Cash" />
-    <StatCard title="Click tushum" value={formatPrice(statsData?.clickRevenue ?? 0)} icon={CreditCard} helper="Click" dark />
+    <StatCard title="Bugungi buyurtmalar" value={statsData?.totalOrders ?? 0} icon={ShoppingBag} helper="Bugun tushgan" />
+    <StatCard title="Yangi" value={statsData?.newOrders ?? 0} icon={Bell} helper="Bugungi yangilar" />
+    <StatCard title="Bugungi naqd" value={formatPrice(statsData?.cashRevenue ?? 0)} icon={Banknote} helper="Bugun naqd" />
+    <StatCard title="Bugungi Click" value={formatPrice(statsData?.clickRevenue ?? 0)} icon={CreditCard} helper="Bugun Click" dark />
     </div>
     
     {page === 'dashboard' && (
