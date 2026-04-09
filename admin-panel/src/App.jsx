@@ -1410,36 +1410,38 @@ export default function App() {
     <StatCard title="Bugungi Click" value={formatPrice(statsData?.clickRevenue ?? 0)} icon={CreditCard} helper="Bugun Click" dark />
     </div>
     
+    {/* Bugungi qo'shimcha ko'rsatkichlar */}
+    <div style={{ display: 'grid', gridTemplateColumns: topStatsGrid, gap: 16 }}>
+    <StatCard title="Yetkazilgan" value={statsData?.deliveredOrders ?? 0} icon={PackageCheck} helper="Bugun yetkazilgan" />
+    <StatCard title="To'langan" value={statsData?.paidOrders ?? 0} icon={Wallet} helper="Bugun to'langan" />
+    <StatCard title="To'lov kutilmoqda" value={statsData?.pendingPaymentOrders ?? 0} icon={Clock3} helper="Click pending" />
+    <StatCard title="Bekor qilingan" value={statsData?.cancelledOrders ?? 0} icon={X} helper="Bugun bekor" />
+    </div>
+    
+    {/* Bugungi umumiy tushum */}
+    <Card style={{ background: '#0f172a', color: '#ffffff' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+    <div>
+    <div style={{ fontSize: 14, color: '#94a3b8', fontWeight: 600 }}>Bugungi umumiy tushum</div>
+    <div style={{ fontSize: isMobile ? 28 : 36, fontWeight: 800, marginTop: 6 }}>
+    {formatPrice((statsData?.cashRevenue ?? 0) + (statsData?.clickRevenue ?? 0))}
+    </div>
+    </div>
+    <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+    <div style={{ textAlign: 'right' }}>
+    <div style={{ fontSize: 12, color: '#64748b' }}>Naqd</div>
+    <div style={{ fontSize: 18, fontWeight: 800, color: '#34d399' }}>{formatPrice(statsData?.cashRevenue ?? 0)}</div>
+    </div>
+    <div style={{ textAlign: 'right' }}>
+    <div style={{ fontSize: 12, color: '#64748b' }}>Click</div>
+    <div style={{ fontSize: 18, fontWeight: 800, color: '#60a5fa' }}>{formatPrice(statsData?.clickRevenue ?? 0)}</div>
+    </div>
+    </div>
+    </div>
+    </Card>
+    
     {page === 'dashboard' && (
       <>
-      <Card>
-      <SectionTitle title="Qisqa ko'rsatkichlar" subtitle="Eng muhim ma'lumotlar shu yerda" isMobile={isMobile} />
-      <div style={{ display: 'grid', gridTemplateColumns: dashboardQuickGrid, gap: 16, marginTop: 18 }}>
-      <div style={{ padding: 18, borderRadius: 20, background: '#eff6ff' }}>
-      <div style={{ color: '#1d4ed8', fontWeight: 700, fontSize: 13 }}>Aktiv buyurtmalar</div>
-      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800, color: '#0f172a' }}>
-      {(statsData?.totalOrders ?? 0) - (statsData?.deliveredOrders ?? 0) - (statsData?.cancelledOrders ?? 0)}
-      </div>
-      </div>
-      <div style={{ padding: 18, borderRadius: 20, background: '#ecfdf5' }}>
-      <div style={{ color: '#047857', fontWeight: 700, fontSize: 13 }}>Yetkazilganlar</div>
-      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800, color: '#0f172a' }}>{statsData?.deliveredOrders ?? 0}</div>
-      </div>
-      <div style={{ padding: 18, borderRadius: 20, background: '#fefce8' }}>
-      <div style={{ color: '#a16207', fontWeight: 700, fontSize: 13 }}>To'lov kutilmoqda</div>
-      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800, color: '#0f172a' }}>{statsData?.pendingPaymentOrders ?? 0}</div>
-      </div>
-      <div style={{ padding: 18, borderRadius: 20, background: '#f5f3ff' }}>
-      <div style={{ color: '#6d28d9', fontWeight: 700, fontSize: 13 }}>To'langanlar</div>
-      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800, color: '#0f172a' }}>{statsData?.paidOrders ?? 0}</div>
-      </div>
-      <div style={{ padding: 18, borderRadius: 20, background: '#fee2e2' }}>
-      <div style={{ color: '#b91c1c', fontWeight: 700, fontSize: 13 }}>Bekor qilingan</div>
-      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800, color: '#0f172a' }}>{statsData?.cancelledOrders ?? 0}</div>
-      </div>
-      </div>
-      </Card>
-      
       <Card>
       <SectionTitle title="So'nggi buyurtmalar" subtitle="Oxirgi 3 ta buyurtma" isMobile={isMobile} />
       <div style={{ display: 'grid', gap: 16, marginTop: 18 }}>
