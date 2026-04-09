@@ -1552,12 +1552,15 @@ function buildAdminText(order) {
         app.get('/api/stats', async (req, res) => {
             const allOrders = getAllOrders();
             
-            // Faqat bugungi buyurtmalar
+            // ?all=true bo'lsa barcha vaqt, aks holda faqat bugungi
+            const showAll = req.query.all === 'true';
+            
             const todayStart = new Date();
             todayStart.setHours(0, 0, 0, 0);
-            const todayStr = todayStart.toISOString();
             
-            const orders = allOrders.filter((o) => {
+            const orders = showAll
+            ? allOrders
+            : allOrders.filter((o) => {
                 if (!o.createdAt) return false;
                 return new Date(o.createdAt) >= todayStart;
             });

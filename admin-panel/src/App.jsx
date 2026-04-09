@@ -973,6 +973,21 @@ export default function App() {
     pendingPaymentOrders: 0,
   });
   
+  
+  const [allStatsData, setAllStatsData] = useState({
+    totalOrders: 0,
+    newOrders: 0,
+    acceptedOrders: 0,
+    readyOrders: 0,
+    deliveredOrders: 0,
+    cancelledOrders: 0,
+    totalRevenue: 0,
+    cashRevenue: 0,
+    clickRevenue: 0,
+    paidOrders: 0,
+    pendingPaymentOrders: 0,
+  });
+  
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -1000,10 +1015,11 @@ export default function App() {
   
   async function loadData({ playSoundForNew = false } = {}) {
     try {
-      const [menuRes, ordersRes, statsRes] = await Promise.all([
+      const [menuRes, ordersRes, statsRes, allStatsRes] = await Promise.all([
         fetch(`${API}/menu`),
         fetch(`${API}/orders`),
         fetch(`${API}/stats`),
+        fetch(`${API}/stats?all=true`),
       ]);
       const menuData = await menuRes.json();
       const ordersData = await ordersRes.json();
@@ -1027,6 +1043,13 @@ export default function App() {
         setStatsData(stats || buildStatsFromOrders(safeOrders));
       } catch {
         setStatsData(buildStatsFromOrders(safeOrders));
+      }
+      
+      try {
+        const allStats = await allStatsRes.json();
+        setAllStatsData(allStats || buildAllStatsFromOrders(safeOrders));
+      } catch {
+        setAllStatsData(buildAllStatsFromOrders(safeOrders));
       }
     } catch (error) {
       console.error("Ma'lumotlarni yuklashda xato:", error);
@@ -1553,23 +1576,39 @@ export default function App() {
     {page === 'stats' && (
       <div style={{ display: 'grid', gap: 22 }}>
       <Card>
-      <SectionTitle title="Umumiy statistika" subtitle="Buyurtmalar va to'lovlar bo'yicha" isMobile={isMobile} />
+      <SectionTitle title="Umumiy statistika" subtitle="Barcha vaqtdagi ma'lumotlar" isMobile={isMobile} />
       <div style={{ marginTop: 18, display: 'grid', gridTemplateColumns: statsGrid4, gap: 16 }}>
       <div style={{ padding: 18, borderRadius: 20, background: '#f8fafc' }}>
-      <div style={{ fontSize: 14, color: '#64748b' }}>Qabul qilingan</div>
-      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800 }}>{statsData?.acceptedOrders ?? 0}</div>
+      <div style={{ fontSize: 14, color: '#64748b' }}>Jami buyurtmalar</div>
+      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800 }}>{allStatsData?.totalOrders ?? 0}</div>
+      </div>
+      <div style={{ padding: 18, borderRadius: 20, background: '#d1fae5' }}>
+      <div style={{ fontSize: 14, color: '#047857' }}>Yetkazilgan</div>
+      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800 }}>{allStatsData?.deliveredOrders ?? 0}</div>
       </div>
       <div style={{ padding: 18, borderRadius: 20, background: '#f8fafc' }}>
-      <div style={{ fontSize: 14, color: '#64748b' }}>Tayyor</div>
-      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800 }}>{statsData?.readyOrders ?? 0}</div>
+      <div style={{ fontSize: 14, color: '#64748b' }}>To'langan</div>
+      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800 }}>{allStatsData?.paidOrders ?? 0}</div>
       </div>
-      <div style={{ padding: 18, borderRadius: 20, background: '#f8fafc' }}>
-      <div style={{ fontSize: 14, color: '#64748b' }}>To'langan buyurtmalar</div>
-      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800 }}>{statsData?.paidOrders ?? 0}</div>
+      <div style={{ padding: 18, borderRadius: 20, background: '#fee2e2' }}>
+      <div style={{ fontSize: 14, color: '#b91c1c' }}>Bekor qilingan</div>
+      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800 }}>{allStatsData?.cancelledOrders ?? 0}</div>
       </div>
-      <div style={{ padding: 18, borderRadius: 20, background: '#f8fafc' }}>
-      <div style={{ fontSize: 14, color: '#64748b' }}>To'lov kutilmoqda</div>
-      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800 }}>{statsData?.pendingPaymentOrders ?? 0}</div>
+      <div style={{ padding: 18, borderRadius: 20, background: '#eff6ff' }}>
+      <div style={{ fontSize: 14, color: '#1d4ed8' }}>Naqd tushum (jami)</div>
+      <div style={{ marginTop: 10, fontSize: 22, fontWeight: 800 }}>{formatPrice(allStatsData?.cashRevenue ?? 0)}</div>
+      </div>
+      <div style={{ padding: 18, borderRadius: 20, background: '#0f172a' }}>
+      <div style={{ fontSize: 14, color: '#94a3b8' }}>Click tushum (jami)</div>
+      <div style={{ marginTop: 10, fontSize: 22, fontWeight: 800, color: '#ffffff' }}>{formatPrice(allStatsData?.clickRevenue ?? 0)}</div>
+      </div>
+      <div style={{ padding: 18, borderRadius: 20, background: '#f0fdf4' }}>
+      <div style={{ fontSize: 14, color: '#047857' }}>Umumiy tushum</div>
+      <div style={{ marginTop: 10, fontSize: 22, fontWeight: 800 }}>{formatPrice(allStatsData?.totalRevenue ?? 0)}</div>
+      </div>
+      <div style={{ padding: 18, borderRadius: 20, background: '#fefce8' }}>
+      <div style={{ fontSize: 14, color: '#a16207' }}>To'lov kutilmoqda</div>
+      <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800 }}>{allStatsData?.pendingPaymentOrders ?? 0}</div>
       </div>
       </div>
       </Card>
