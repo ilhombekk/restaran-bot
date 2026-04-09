@@ -14,6 +14,9 @@ import {
     editMenuItem,
     deleteMenuItem,
     setMenuItemActive,
+    setMenuItemOrder,
+    setCategoryOrder,
+    getCategoryOrders,
     normalizeKey,
     formatMenuList
 } from './menu.js';
@@ -923,6 +926,77 @@ function buildAdminText(order) {
                 const item = await setMenuItemActive(key, true);
                 sendSseEvent('menu_updated');
                 return ctx.reply(`Ochildi: ${item.name} (${item.key})`);
+            } catch (error) {
+                return ctx.reply(`Xato: ${error.message}`);
+            }
+        });
+        
+        // /catorder KategoriyaNomi 1 — kategoriya tartibini o'zgartirish
+        bot.command('catorder', async (ctx) => {
+            if (!isAdminChat(ctx)) return;
+            
+            const text = ctx.message.text.replace('/catorder', '').trim();
+            
+            // Agar bo'sh bo'lsa — hozirgi tartibni ko'rsat
+            if (!text) {
+                const orders = getCategoryOrders();
+                if (!orders.length) return ctx.reply("Hozircha kategoriyalar yo'q.");
+                const list = orders.map((c) => `${c.order}. ${c.category}`).join('\n');
+                return ctx.reply(
+                    `Hozirgi kategoriya tartibi:\n\n${list}\n\nO'zgartirish uchun:\n/catorder KategoriyaNomi 1`
+                );
+            }
+            
+            // Oxirgi so'z raqam bo'lishi kerak
+            const parts = text.split(/\s+/);
+            const orderNum = Number(parts[parts.length - 1]);
+            
+            if (!Number.isFinite(orderNum) || orderNum < 1) {
+                return ctx.reply(
+                    "Format: /catorder KategoriyaNomi tartib_raqami\n\nMasalan:\n/catorder BURGER 1\n/catorder LAVASH 2\n/catorder PIZZA 3\n\nHozirgi tartibni ko'rish: /catorder"
+                );
+            }
+            
+            const category = parts.slice(0, -1).join(' ').trim();
+            if (!category) {
+                return ctx.reply("Kategoriya nomini yozing. Masalan: /catorder BURGER 1");
+            }
+            
+            try {
+                const result = await setCategoryOrder(category, orderNum);
+                sendSseEvent('menu_updated');
+                return ctx.reply(
+                    `Kategoriya tartibi o'zgartirildi: "${result.category}" → #${result.order}\n\nYangi tartibni ko'rish: /catorder`
+                );
+            } catch (error) {
+                return ctx.reply(`Xato: ${error.message}`);
+            }
+        });
+        
+        // /order key 5  — mahsulot tartibini o'zgartirish
+        bot.command('order', async (ctx) => {
+            if (!isAdminChat(ctx)) return;
+            
+            const parts = ctx.message.text.replace('/order', '').trim().split(/\s+/);
+            if (parts.length !== 2) {
+                return ctx.reply(
+                    "Format: /order key tartib_raqami\n\nMasalan:\n/order burger 1\n/order lavash 2\n/order pizza 3\n\nHozirgi tartibni ko'rish: /list"
+                );
+            }
+            
+            const rawKey = parts[0];
+            const orderNum = Number(parts[1]);
+            
+            if (!Number.isFinite(orderNum) || orderNum < 1) {
+                return ctx.reply("Tartib raqami musbat son bo'lishi kerak. Masalan: /order burger 1");
+            }
+            
+            const key = normalizeKey(rawKey);
+            
+            try {
+                const item = await setMenuItemOrder(key, orderNum);
+                sendSseEvent('menu_updated');
+                return ctx.reply(`Tartib o'zgartirildi: ${item.name} → #${item.order}\n\nYangi tartibni ko'rish: /list`);
             } catch (error) {
                 return ctx.reply(`Xato: ${error.message}`);
             }

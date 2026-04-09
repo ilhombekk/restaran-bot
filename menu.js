@@ -1,6 +1,7 @@
-import { getMenuCollection } from './db.js';
+import { getMenuCollection, getCategoryOrderCollection } from './db.js';
 
 let menuCache = {};
+let categoryOrderCache = {}; // { 'BURGER': 1, 'LAVASH': 2, ... }
 
 export async function initMenu() {
     const collection = await getMenuCollection();
@@ -16,43 +17,16 @@ export async function initMenu() {
             category: item.category || 'Boshqa',
             image: item.image || '',
             active: item.active !== false,
+            order: Number(item.order ?? 9999), // tartib raqami
         };
     }
     
     if (Object.keys(menuCache).length === 0) {
         const seedItems = [
-            {
-                key: 'lavash',
-                name: 'Lavash',
-                price: 28000,
-                category: 'Fast Food',
-                image: '',
-                active: true,
-            },
-            {
-                key: 'burger',
-                name: 'Burger',
-                price: 32000,
-                category: 'Fast Food',
-                image: '',
-                active: true,
-            },
-            {
-                key: 'pizza',
-                name: 'Pizza',
-                price: 65000,
-                category: 'Pizza',
-                image: '',
-                active: true,
-            },
-            {
-                key: 'cola_1l',
-                name: 'Coca-Cola 1L',
-                price: 12000,
-                category: 'Ichimliklar',
-                image: '',
-                active: true,
-            }
+            { key: 'lavash', name: 'Lavash', price: 28000, category: 'Fast Food', image: '', active: true, order: 1 },
+            { key: 'burger', name: 'Burger', price: 32000, category: 'Fast Food', image: '', active: true, order: 2 },
+            { key: 'pizza', name: 'Pizza', price: 65000, category: 'Pizza', image: '', active: true, order: 3 },
+            { key: 'cola_1l', name: 'Coca-Cola 1L', price: 12000, category: 'Ichimliklar', image: '', active: true, order: 4 },
         ];
         
         await collection.insertMany(seedItems);
@@ -60,6 +34,18 @@ export async function initMenu() {
         for (const item of seedItems) {
             menuCache[item.key] = item;
         }
+    }
+    
+    // Kategoriya tartibini DB dan yuklash
+    try {
+        const catCollection = await getCategoryOrderCollection();
+        const catOrders = await catCollection.find({}).toArray();
+        categoryOrderCache = {};
+        for (const item of catOrders) {
+            categoryOrderCache[item.category] = Number(item.order ?? 9999);
+        }
+    } catch {
+        categoryOrderCache = {};
     }
     
     return menuCache;
@@ -78,28 +64,69 @@ export function getMenu() {
 
 export function getMenuArray({ activeOnly = false } = {}) {
     const items = Object.values(menuCache);
-    return activeOnly ? items.filter((item) => item.active) : items;
+    const filtered = activeOnly ? items.filter((item) => item.active) : items;
+    // order maydoni bo'yicha tartiblash
+    return filtered.sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
 }
 
 export function getMenuItem(key) {
     return menuCache[normalizeKey(key)] || null;
 }
 
+// Kategoriyalar: avval categoryOrderCache, keyin mahsulot order bo'yicha
 export function getCategories({ activeOnly = false } = {}) {
     const items = getMenuArray({ activeOnly });
-    return [...new Set(items.map((item) => item.category).filter(Boolean))];
+    
+    const uniqueCategories = [...new Set(items.map((i) => i.category).filter(Boolean))];
+    
+    return uniqueCategories.sort((a, b) => {
+        const oa = categoryOrderCache[a] ?? 9999;
+        const ob = categoryOrderCache[b] ?? 9999;
+        return oa - ob;
+    });
+}
+
+// Kategoriya tartibini o'zgartirish
+export async function setCategoryOrder(category, order) {
+    const cat = String(category).trim();
+    const ord = Number(order);
+    
+    const collection = await getCategoryOrderCollection();
+    await collection.updateOne(
+        { category: cat },
+        { $set: { category: cat, order: ord } },
+        { upsert: true }
+    );
+    
+    categoryOrderCache[cat] = ord;
+    return { category: cat, order: ord };
+}
+
+// Barcha kategoriya tartiblarini ko'rish
+export function getCategoryOrders() {
+    const items = getMenuArray();
+    const uniqueCategories = [...new Set(items.map((i) => i.category).filter(Boolean))];
+    
+    return uniqueCategories.map((cat) => ({
+        category: cat,
+        order: categoryOrderCache[cat] ?? 9999,
+    })).sort((a, b) => a.order - b.order);
 }
 
 export function getItemsByCategory(category, { activeOnly = false } = {}) {
     return getMenuArray({ activeOnly }).filter((item) => item.category === category);
 }
 
-export async function addMenuItem(key, name, price, category, image = '') {
+export async function addMenuItem(key, name, price, category, image = '', order = null) {
     const normalizedKey = normalizeKey(key);
     
     if (menuCache[normalizedKey]) {
         throw new Error('Bunday key bilan mahsulot mavjud');
     }
+    
+    // Agar order berilmasa, mavjud eng katta order + 1
+    const maxOrder = Object.values(menuCache).reduce((max, item) => Math.max(max, item.order ?? 0), 0);
+    const itemOrder = order !== null ? Number(order) : maxOrder + 1;
     
     const item = {
         key: normalizedKey,
@@ -108,6 +135,7 @@ export async function addMenuItem(key, name, price, category, image = '') {
         category: String(category).trim(),
         image: String(image || '').trim(),
         active: true,
+        order: itemOrder,
     };
     
     const collection = await getMenuCollection();
@@ -117,7 +145,7 @@ export async function addMenuItem(key, name, price, category, image = '') {
     return item;
 }
 
-export async function editMenuItem(key, name, price, category, image = '') {
+export async function editMenuItem(key, name, price, category, image = '', order = null) {
     const normalizedKey = normalizeKey(key);
     
     if (!menuCache[normalizedKey]) {
@@ -132,6 +160,11 @@ export async function editMenuItem(key, name, price, category, image = '') {
         image: String(image || '').trim(),
     };
     
+    // Agar order berilgan bo'lsa yangilash
+    if (order !== null) {
+        updated.order = Number(order);
+    }
+    
     const collection = await getMenuCollection();
     await collection.updateOne(
         { key: normalizedKey },
@@ -141,12 +174,30 @@ export async function editMenuItem(key, name, price, category, image = '') {
                 price: updated.price,
                 category: updated.category,
                 image: updated.image,
+                order: updated.order,
             }
         }
     );
     
     menuCache[normalizedKey] = updated;
     return updated;
+}
+
+export async function setMenuItemOrder(key, order) {
+    const normalizedKey = normalizeKey(key);
+    
+    if (!menuCache[normalizedKey]) {
+        throw new Error('Mahsulot topilmadi');
+    }
+    
+    const collection = await getMenuCollection();
+    await collection.updateOne(
+        { key: normalizedKey },
+        { $set: { order: Number(order) } }
+    );
+    
+    menuCache[normalizedKey].order = Number(order);
+    return menuCache[normalizedKey];
 }
 
 export async function deleteMenuItem(key) {
@@ -188,13 +239,13 @@ export function formatMenuList() {
     const items = getMenuArray();
     
     if (!items.length) {
-        return 'Mahsulotlar yo‘q';
+        return "Mahsulotlar yo'q";
     }
     
     return items
     .map((item, index) => {
         const status = item.active ? 'aktiv' : 'yashirin';
-        return `${index + 1}. ${item.name} — ${item.price} so'm | ${item.category} | key: ${item.key} | ${status}`;
+        return `${index + 1}. [${item.order}] ${item.name} — ${item.price} so'm | ${item.category} | key: ${item.key} | ${status}`;
     })
     .join('\n');
 }
