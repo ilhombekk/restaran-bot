@@ -1395,7 +1395,7 @@ export default function App() {
       <div style={{ padding: 18, borderRadius: 20, background: '#eff6ff' }}>
       <div style={{ color: '#1d4ed8', fontWeight: 700, fontSize: 13 }}>Aktiv buyurtmalar</div>
       <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800, color: '#0f172a' }}>
-      {orders.filter((o) => o.status !== 'Yetkazildi' && o.status !== 'Bekor qilindi').length}
+      {(statsData?.totalOrders ?? 0) - (statsData?.deliveredOrders ?? 0) - (statsData?.cancelledOrders ?? 0)}
       </div>
       </div>
       <div style={{ padding: 18, borderRadius: 20, background: '#ecfdf5' }}>
