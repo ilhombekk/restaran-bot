@@ -223,6 +223,30 @@ function getPaymentStatusText(paymentStatus) {
     return "To'lov kutilmoqda";
 }
 
+// =============================================
+// SHOVOT TUMANI TEKSHIRUVI
+// Faqat Shovot tumani (Xorazm viloyati) ichidan zakaz qabul qilinadi
+// =============================================
+const SHOVOT_LAT = 41.5553;
+const SHOVOT_LON = 60.3311;
+const SHOVOT_RADIUS_KM = 15; // Shovot tumani radiusi ~15 km
+
+function getDistanceKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function isInShovot(lat, lon) {
+    const distance = getDistanceKm(SHOVOT_LAT, SHOVOT_LON, lat, lon);
+    return distance <= SHOVOT_RADIUS_KM;
+}
+
 function clearPaymentTimer(orderId) {
     const existing = paymentTimers.get(String(orderId));
     if (existing) {
@@ -1203,12 +1227,13 @@ function buildAdminText(order) {
             
             return ctx.reply(
                 [
-                    '📍 *Yetkazib berish manzili*',
+                    '📍 Yetkazib berish manzili',
+                    '',
+                    "⚠️ Biz faqat Shovot tumani (Xorazm viloyati) bo'ylab yetkazib beramiz!",
                     '',
                     "Quyidagi usullardan birini tanlang:",
-                    '',
-                    "📍 *Lokatsiya* — Aniq joylashuvingizni yuboring",
-                    "✏️ *Manzilni yozish* — Qo'lda kiriting"
+                    "📍 Lokatsiya — Aniq joylashuvingizni yuboring",
+                    "✏️ Manzilni yozish — Ko'cha, uy raqamini kiriting"
                 ].join('\n'),
                 Markup.keyboard([
                     [Markup.button.locationRequest('📍 Lokatsiya yuborish')],
@@ -1233,6 +1258,19 @@ function buildAdminText(order) {
             
             const { latitude, longitude } = ctx.message.location;
             
+            // Shovot tumani tekshiruvi
+            if (!isInShovot(latitude, longitude)) {
+                return ctx.reply(
+                    [
+                        '❌ Kechirasiz, biz hozircha faqat Shovot tumani (Xorazm viloyati) bo\'ylab yetkazib beramiz.',
+                        '',
+                        '📍 Lokatsiyangiz bizning yetkazib berish hududimizdan tashqarida.',
+                        '',
+                        'Agar Shovot tumani ichida bo\'lsangiz, to\'g\'ri lokatsiya yuboring yoki manzilni qo\'lda yozing.'
+                    ].join('\n')
+                );
+            }
+            
             return finalizeOrder(
                 ctx,
                 {
@@ -1249,9 +1287,12 @@ function buildAdminText(order) {
             
             if (ctx.session.step === 'address') {
                 if (!text || text.length < 5 || text === "✏️ Manzilni yozaman") {
-                    return ctx.reply("⚠️ Iltimos, manzilni to'liqroq yozing.\n\nMasalan: Toshkent, Chilonzor, 12-uy");
+                    return ctx.reply(
+                        "⚠️ Iltimos, manzilni to'liqroq yozing.\n\nMasalan: Shovot tumani, Ko'hna Urganch ko'chasi, 15-uy"
+                    );
                 }
                 
+                // Matnli manzil — faqat Shovot tumani ichida bo'lishi haqida eslatma
                 return finalizeOrder(
                     ctx,
                     { text },
