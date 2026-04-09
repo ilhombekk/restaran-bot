@@ -1406,8 +1406,6 @@ export default function App() {
     <div style={{ display: 'grid', gridTemplateColumns: topStatsGrid, gap: 16 }}>
     <StatCard title="Bugungi buyurtmalar" value={statsData?.totalOrders ?? 0} icon={ShoppingBag} helper="Bugun tushgan" />
     <StatCard title="Yangi" value={statsData?.newOrders ?? 0} icon={Bell} helper="Bugungi yangilar" />
-    <StatCard title="Bugungi naqd" value={formatPrice(statsData?.cashRevenue ?? 0)} icon={Banknote} helper="Bugun naqd" />
-    <StatCard title="Bugungi Click" value={formatPrice(statsData?.clickRevenue ?? 0)} icon={CreditCard} helper="Bugun Click" dark />
     </div>
     
     {/* Bugungi qo'shimcha ko'rsatkichlar */}
