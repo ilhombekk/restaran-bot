@@ -1403,13 +1403,9 @@ export default function App() {
       </Card>
     )}
     
-    <div style={{ display: 'grid', gridTemplateColumns: topStatsGrid, gap: 16 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : isTablet ? 'repeat(3, 1fr)' : 'repeat(6, 1fr)', gap: 16 }}>
     <StatCard title="Bugungi buyurtmalar" value={statsData?.totalOrders ?? 0} icon={ShoppingBag} helper="Bugun tushgan" />
     <StatCard title="Yangi" value={statsData?.newOrders ?? 0} icon={Bell} helper="Bugungi yangilar" />
-    </div>
-    
-    {/* Bugungi qo'shimcha ko'rsatkichlar */}
-    <div style={{ display: 'grid', gridTemplateColumns: topStatsGrid, gap: 16 }}>
     <StatCard title="Yetkazilgan" value={statsData?.deliveredOrders ?? 0} icon={PackageCheck} helper="Bugun yetkazilgan" />
     <StatCard title="To'langan" value={statsData?.paidOrders ?? 0} icon={Wallet} helper="Bugun to'langan" />
     <StatCard title="To'lov kutilmoqda" value={statsData?.pendingPaymentOrders ?? 0} icon={Clock3} helper="Click pending" />
