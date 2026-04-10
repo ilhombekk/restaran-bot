@@ -106,8 +106,8 @@ bot.use(
 );
 
 const mainKeyboard = Markup.keyboard([
-    ['🍽 Menyu', '🛒 Savat'],
-    ['☎️ Aloqa']
+    ['🛒 Buyurtma berish', '📦 Buyurtmalarim'],
+    ['💬 Fikr bildirish', '⚙️ Sozlamalar']
 ]).resize();
 
 function isAdminChat(ctx) {
@@ -849,13 +849,15 @@ function buildAdminText(order) {
             ctx.session.orderData = {};
             ctx.session.currentCategory = null;
             
+            const name = ctx.from.first_name || 'Mehmon';
             return ctx.reply(
                 [
-                    '🍔 *Ajabo Burger*ga xush kelibsiz!',
+                    `Assalomu alaykum, ${name}! 👋`,
                     '',
-                    '🌟 Mazali burgerlar va tez yetkazib berish!',
+                    '🍔 Ajabo Burger ga xush kelibsiz!',
+                    '🚀 Tez va mazali yetkazib berish xizmati.',
                     '',
-                    '👇 Quyidagi tugmalardan birini tanlang:'
+                    'Quyidagilardan birini tanlang:'
                 ].join('\n'),
                 mainKeyboard
             );
@@ -1059,6 +1061,95 @@ function buildAdminText(order) {
         // BOT ACTIONS
         // =============================================
         
+        
+        // =============================================
+        // YANGI ASOSIY TUGMALAR
+        // =============================================
+        
+        bot.hears('🛒 Buyurtma berish', async (ctx) => {
+            clearUnavailableCartItems(ctx.session.cart);
+            ctx.session.step = null;
+            ctx.session.orderData = {};
+            ctx.session.currentCategory = null;
+            
+            if (!isRestaurantOpen()) {
+                return ctx.reply(getClosedText());
+            }
+            
+            // Yetkazish turi tanlash
+            ctx.session.step = 'delivery_type';
+            return ctx.reply(
+                [
+                    'Buyurtma qanday bo\'ladi?',
+                    '',
+                    '🚚 Yetkazib berish — Shovot tumani bo\'ylab',
+                    "📦 O'zim olib ketaman — Restorandan"
+                ].join('\n'),
+                Markup.keyboard([
+                    ['🚚 Yetkazib berish'],
+                    ["📦 O'zim olib ketaman"]
+                ]).resize().oneTime()
+            );
+        });
+        
+        bot.hears('📦 Buyurtmalarim', async (ctx) => {
+            // Foydalanuvchining so'nggi buyurtmasini ko'rsatish
+            const allOrders = getAllOrders();
+            const myOrders = allOrders
+            .filter(o => String(o.userId) === String(ctx.from.id))
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+            .slice(0, 5);
+            
+            if (!myOrders.length) {
+                return ctx.reply(
+                    "Sizda hali buyurtma yo'q.\n\nBuyurtma berish uchun 🛒 Buyurtma berish tugmasini bosing.",
+                    mainKeyboard
+                );
+            }
+            
+            const text = myOrders.map((o, i) => [
+                `${i + 1}. Buyurtma #${o.id}`,
+                `   Holat: ${o.status}`,
+                `   Jami: ${formatPrice(o.total)}`,
+                `   Vaqt: ${new Date(o.createdAt).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })}`
+            ].join('\n')).join('\n\n');
+            
+            return ctx.reply(
+                "So'nggi buyurtmalaringiz:\n\n" + text,
+                mainKeyboard
+            );
+        });
+        
+        bot.hears('💬 Fikr bildirish', (ctx) => {
+            ctx.session.step = 'feedback';
+            return ctx.reply(
+                "Fikr yoki taklifingizni yozing:\n\nMasalan: Taom mazali edi, lekin biroz kech yetkazildi.",
+                Markup.keyboard([['❌ Bekor qilish']]).resize().oneTime()
+            );
+        });
+        
+        bot.hears('⚙️ Sozlamalar', (ctx) => {
+            return ctx.reply(
+                [
+                    'Ajabo Burger',
+                    '',
+                    `📞 Telefon: +998 90 123 45 67`,
+                    `🕒 Ish vaqti: ${getWorkHoursText()}`,
+                    `⏰ Hozirgi vaqt: ${getCurrentTimeText()}`,
+                    '',
+                    isRestaurantOpen()
+                    ? '🟢 Hozir ochiq'
+                    : '🔴 Hozir yopiq'
+                ].join('\n'),
+                mainKeyboard
+            );
+        });
+        
+        bot.hears('❌ Bekor qilish', (ctx) => {
+            ctx.session.step = null;
+            return ctx.reply("Bekor qilindi.", mainKeyboard);
+        });
+        
         bot.hears('🍽 Menyu', async (ctx) => {
             clearUnavailableCartItems(ctx.session.cart);
             ctx.session.currentCategory = null;
@@ -1232,19 +1323,21 @@ function buildAdminText(order) {
             if (ctx.session.step !== 'delivery_type') return;
             
             ctx.session.orderData.deliveryType = 'delivery';
-            ctx.session.step = 'payment_method';
+            ctx.session.step = 'location_check'; // avval lokatsiya tekshirish
             
             return ctx.reply(
                 [
-                    "💳 *To'lov usulini tanlang:*",
+                    '📍 Manzilni tasdiqlash',
                     '',
-                    "💵 *Naqd* — Yetkazib berishda to'laysiz",
-                    "💳 *Click* — Hoziroq onlayn to'lang"
+                    'Biz faqat Shovot tumani (Xorazm viloyati) bo\'ylab yetkazib beramiz.',
+                    '',
+                    'Lokatsiyangizni yuboring — Shovot tumani ichida ekanligingiz tekshiriladi.'
                 ].join('\n'),
                 Markup.keyboard([
-                    ['💵 Naqd'],
-                    ['💳 Click']
-                ]).resize().oneTime()
+                    [Markup.button.locationRequest('📍 Lokatsiya yuborish')],
+                    ["✏️ Manzilni yozaman"],
+                    ['❌ Bekor qilish']
+                ]).resize()
             );
         });
         
@@ -1341,7 +1434,8 @@ function buildAdminText(order) {
         });
         
         bot.hears("✏️ Manzilni yozaman", (ctx) => {
-            if (ctx.session.step !== 'address') return;
+            if (ctx.session.step !== 'address' && ctx.session.step !== 'location_check') return;
+            ctx.session.step = 'address';
             return ctx.reply(
                 [
                     '✏️ *Manzilingizni yozing:*',
@@ -1352,19 +1446,54 @@ function buildAdminText(order) {
         });
         
         bot.on('location', async (ctx) => {
-            if (ctx.session.step !== 'address') return;
-            
             const { latitude, longitude } = ctx.message.location;
             
-            // Shovot tumani tekshiruvi
+            // location_check — Shovot tekshiruvi, keyin to'lov
+            if (ctx.session.step === 'location_check') {
+                if (!isInShovot(latitude, longitude)) {
+                    return ctx.reply(
+                        [
+                            '❌ Kechirasiz!',
+                            '',
+                            'Biz faqat Shovot tumani (Xorazm viloyati) bo\'ylab yetkazib beramiz.',
+                            'Lokatsiyangiz bizning hududimizdan tashqarida.',
+                            '',
+                            'Iltimos, Shovot tumani ichidagi manzilingizni yuboring.'
+                        ].join('\n')
+                    );
+                }
+                
+                // Shovot ichida — lokatsiyani saqlab to'lov tanlashga o'tish
+                ctx.session.orderData.location = {
+                    lat: latitude,
+                    lon: longitude,
+                    text: `${latitude}, ${longitude}`
+                };
+                ctx.session.step = 'payment_method';
+                
+                return ctx.reply(
+                    [
+                        "✅ Manzil tasdiqlandi!",
+                        '',
+                        "To'lov usulini tanlang:",
+                        "💵 Naqd — Yetkazib berishda to'laysiz",
+                        "💳 Click — Hoziroq onlayn to'lang"
+                    ].join('\n'),
+                    Markup.keyboard([
+                        ['💵 Naqd'],
+                        ['💳 Click']
+                    ]).resize().oneTime()
+                );
+            }
+            
+            // address step — eski oqim
+            if (ctx.session.step !== 'address') return;
+            
             if (!isInShovot(latitude, longitude)) {
                 return ctx.reply(
                     [
-                        '❌ Kechirasiz, biz hozircha faqat Shovot tumani (Xorazm viloyati) bo\'ylab yetkazib beramiz.',
-                        '',
-                        '📍 Lokatsiyangiz bizning yetkazib berish hududimizdan tashqarida.',
-                        '',
-                        'Agar Shovot tumani ichida bo\'lsangiz, to\'g\'ri lokatsiya yuboring yoki manzilni qo\'lda yozing.'
+                        '❌ Kechirasiz, biz faqat Shovot tumani bo\'ylab yetkazib beramiz.',
+                        'Lokatsiyangiz hududimizdan tashqarida.'
                     ].join('\n')
                 );
             }
@@ -1382,6 +1511,33 @@ function buildAdminText(order) {
         
         bot.on('text', async (ctx, next) => {
             const text = (ctx.message.text || '').trim();
+            
+            // Feedback
+            if (ctx.session.step === 'feedback') {
+                if (!text || text === '❌ Bekor qilish') {
+                    ctx.session.step = null;
+                    return ctx.reply("Bekor qilindi.", mainKeyboard);
+                }
+                ctx.session.step = null;
+                // Admin ga yuborish
+                if (ADMIN_CHAT_ID) {
+                    try {
+                        await bot.telegram.sendMessage(
+                            ADMIN_CHAT_ID,
+                            [
+                                'Yangi fikr/taklif:',
+                                '',
+                                `👤 ${ctx.from.first_name || ''} ${ctx.from.username ? '@'+ctx.from.username : ''}`,
+                                `💬 ${text}`
+                            ].join('\n')
+                        );
+                    } catch {}
+                }
+                return ctx.reply(
+                    "Fikringiz uchun rahmat! Albatta hisobga olamiz. 🙏",
+                    mainKeyboard
+                );
+            }
             
             if (ctx.session.step === 'address') {
                 if (!text || text.length < 5 || text === "✏️ Manzilni yozaman") {
