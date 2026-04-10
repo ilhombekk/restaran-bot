@@ -2,6 +2,11 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { Telegraf, Markup, session } from 'telegraf';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 import { connectDb } from './db.js';
 import {
@@ -50,6 +55,9 @@ const app = express();
 
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
+
+// Mini App static fayllar
+app.use('/miniapp', express.static(join(__dirname, 'miniApp')));
 
 const sseClients = new Set();
 const paymentTimers = new Map();
@@ -1546,6 +1554,71 @@ function buildAdminText(order) {
         
         app.get('/api/orders', async (req, res) => {
             return res.json(getAllOrders());
+        });
+        
+        // Mini App dan buyurtma qabul qilish
+        app.post('/api/orders', async (req, res) => {
+            try {
+                const order = req.body;
+                
+                if (!order.id || !order.total) {
+                    return res.status(400).json({ error: 'id va total kerak' });
+                }
+                
+                await addOrder(order);
+                sendSseEvent('order_created', order);
+                
+                // Admin guruhga xabar yuborish (faqat delivery)
+                if (ADMIN_CHAT_ID && order.deliveryType !== 'pickup') {
+                    try {
+                        const adminMessage = await bot.telegram.sendMessage(
+                            ADMIN_CHAT_ID,
+                            buildAdminText(order),
+                            getButtonsByStatus(order)
+                        );
+                        
+                        if (order.location?.lat && order.location?.lon) {
+                            await bot.telegram.sendLocation(ADMIN_CHAT_ID, order.location.lat, order.location.lon);
+                        }
+                        
+                        await updateOrderAdminMessages(order.id, {
+                            adminMessageId: adminMessage?.message_id ?? null,
+                            adminLocationMessageId: null
+                        });
+                        
+                        const freshOrder = getOrderById(order.id);
+                        if (freshOrder) sendSseEvent('order_updated', freshOrder);
+                    } catch (err) {
+                        console.log('Mini App admin xabari xato:', err.message);
+                    }
+                } else {
+                    sendSseEvent('order_updated', order);
+                }
+                
+                // Click bo'lsa timer ishga tushirish
+                if (order.paymentMethod === 'click' && order.chatId) {
+                    scheduleClickPaymentTimeout(order.id);
+                    try {
+                        await bot.telegram.sendMessage(
+                            order.chatId,
+                            [
+                                "Mini App orqali buyurtma qabul qilindi!",
+                                "",
+                                `Buyurtma ID: #${order.id}`,
+                                `Jami: ${formatPrice(order.total)}`,
+                                "",
+                                "Click to'lovi uchun 10 daqiqa vaqtingiz bor."
+                            ].join('\n'),
+                            mainKeyboard
+                        );
+                    } catch {}
+                }
+                
+                return res.json({ success: true, id: order.id });
+            } catch (error) {
+                console.error('Mini App order xato:', error);
+                return res.status(500).json({ error: error.message });
+            }
         });
         
         app.put('/api/orders/:id/status', async (req, res) => {
