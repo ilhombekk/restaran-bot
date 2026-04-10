@@ -57,24 +57,22 @@ app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 
 // Mini App static fayllar
-import { existsSync, readdirSync } from 'fs';
+import { existsSync } from 'fs';
 
-const miniAppPath1 = join(__dirname, 'miniApp');
-const miniAppPath2 = join(__dirname, 'miniapp');
+// Barcha mumkin bo'lgan pathlarni tekshirish
+const possiblePaths = [
+    join(__dirname, 'miniApp'),
+    join(__dirname, 'miniapp'),
+    join(__dirname, 'restaurant-bot', 'miniApp'),
+    join(__dirname, 'restaurant-bot', 'miniapp'),
+];
 
-console.log('__dirname:', __dirname);
-console.log('miniApp exists:', existsSync(miniAppPath1), miniAppPath1);
-console.log('miniapp exists:', existsSync(miniAppPath2), miniAppPath2);
-try { console.log('Files in __dirname:', readdirSync(__dirname)); } catch(e) {}
-
-if (existsSync(miniAppPath1)) {
-    app.use('/miniapp', express.static(miniAppPath1));
-    console.log('Serving from:', miniAppPath1);
-} else if (existsSync(miniAppPath2)) {
-    app.use('/miniapp', express.static(miniAppPath2));
-    console.log('Serving from:', miniAppPath2);
+const miniAppPath = possiblePaths.find(p => existsSync(p));
+if (miniAppPath) {
+    app.use('/miniapp', express.static(miniAppPath));
+    console.log('MiniApp serving from:', miniAppPath);
 } else {
-    console.log('miniApp papka topilmadi!');
+    console.log('miniApp papka topilmadi! Tekshirilgan pathlar:', possiblePaths);
 }
 
 const sseClients = new Set();
