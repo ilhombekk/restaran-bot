@@ -56,9 +56,26 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 
-// Mini App static fayllar (har ikkala papka nomini qo'llab-quvvatlash)
-app.use('/miniapp', express.static(join(__dirname, 'miniApp')));
-app.use('/miniapp', express.static(join(__dirname, 'miniapp')));
+// Mini App static fayllar
+import { existsSync, readdirSync } from 'fs';
+
+const miniAppPath1 = join(__dirname, 'miniApp');
+const miniAppPath2 = join(__dirname, 'miniapp');
+
+console.log('__dirname:', __dirname);
+console.log('miniApp exists:', existsSync(miniAppPath1), miniAppPath1);
+console.log('miniapp exists:', existsSync(miniAppPath2), miniAppPath2);
+try { console.log('Files in __dirname:', readdirSync(__dirname)); } catch(e) {}
+
+if (existsSync(miniAppPath1)) {
+    app.use('/miniapp', express.static(miniAppPath1));
+    console.log('Serving from:', miniAppPath1);
+} else if (existsSync(miniAppPath2)) {
+    app.use('/miniapp', express.static(miniAppPath2));
+    console.log('Serving from:', miniAppPath2);
+} else {
+    console.log('miniApp papka topilmadi!');
+}
 
 const sseClients = new Set();
 const paymentTimers = new Map();
