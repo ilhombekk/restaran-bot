@@ -41,3 +41,8 @@ export async function getOrdersCollection() {
     const db = await getDb();
     return db.collection('orders');
 }
+
+export async function getCategoryOrderCollection() {
+    const db = await getDb();
+    return db.collection('category_orders');
+}
