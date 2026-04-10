@@ -56,8 +56,9 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 
-// Mini App static fayllar
+// Mini App static fayllar (har ikkala papka nomini qo'llab-quvvatlash)
 app.use('/miniapp', express.static(join(__dirname, 'miniApp')));
+app.use('/miniapp', express.static(join(__dirname, 'miniapp')));
 
 const sseClients = new Set();
 const paymentTimers = new Map();
