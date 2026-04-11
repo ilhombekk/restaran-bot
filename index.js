@@ -45,6 +45,7 @@ const WORK_START = process.env.WORK_START || '09:00';
 const WORK_END = process.env.WORK_END || '23:00';
 const PORT = Number(process.env.PORT || 10000);
 const CLICK_PAYMENT_TIMEOUT_MS = 10 * 60 * 1000; // 10 minut
+const DELIVERY_FEE = 12000; // Yetkazib berish narxi
 const MINIAPP_URL = process.env.MINIAPP_URL || 'https://restaran-bot-1.onrender.com/miniapp/miniapp.html';
 
 if (!BOT_TOKEN) {
@@ -338,6 +339,8 @@ function buildAdminText(order) {
             locationLine,
             '',
             order.cartText,
+            `Mahsulotlar: ${formatPrice(order.subtotal || order.total)}`,
+            ...(order.deliveryFee ? [`Yetkazib berish: ${formatPrice(order.deliveryFee)}`] : []),
             `Jami: ${formatPrice(order.total)}`,
             ...(order.clickTransactionId ? [`Click transaction: ${order.clickTransactionId}`] : []),
             ...(order.paidAt ? [`To'langan vaqt: ${new Date(order.paidAt).toLocaleString('uz-UZ', { timeZone: TIME_ZONE })}`] : []),
@@ -663,13 +666,17 @@ function buildAdminText(order) {
     async function finalizeOrder(ctx, locationData, locationNoticeText) {
         clearUnavailableCartItems(ctx.session.cart);
         
-        const total = getCartTotal(ctx.session.cart);
-        if (total === 0) {
+        const cartSubtotal = getCartTotal(ctx.session.cart);
+        if (cartSubtotal === 0) {
             ctx.session.step = null;
             ctx.session.orderData = {};
             ctx.session.currentCategory = null;
             return ctx.reply("🛒 Savatingiz bo'sh bo'lib qoldi.\n\nMenyu bo'limidan mahsulot tanlang!", mainKeyboard);
         }
+        
+        const selectedDeliveryType = ctx.session.orderData.deliveryType || 'delivery';
+        const deliveryFee = selectedDeliveryType === 'delivery' ? DELIVERY_FEE : 0;
+        const total = cartSubtotal + deliveryFee;
         
         const cartText = getCartText(ctx.session.cart);
         const orderId = generateOrderId();
@@ -680,7 +687,7 @@ function buildAdminText(order) {
             name: ctx.session.orderData.name,
             phone: ctx.session.orderData.phone,
             username: ctx.session.orderData.username,
-            deliveryType: ctx.session.orderData.deliveryType || 'delivery',
+            deliveryType: selectedDeliveryType,
             paymentMethod: selectedPaymentMethod,
             paymentStatus: 'pending',
             paidAt: null,
@@ -691,6 +698,8 @@ function buildAdminText(order) {
             location: locationData,
             cart: { ...ctx.session.cart },
             cartText,
+            subtotal: cartSubtotal,
+            deliveryFee,
             total,
             status: 'Yangi buyurtma',
             createdAt: new Date().toISOString(),
@@ -717,6 +726,8 @@ function buildAdminText(order) {
             '',
             order.cartText,
             '',
+            `Mahsulotlar: ${formatPrice(order.subtotal || order.total)}`,
+            ...(order.deliveryFee ? [`Yetkazib berish: ${formatPrice(order.deliveryFee)}`] : []),
             `💰 Jami: ${formatPrice(order.total)}`,
             '',
             '━━━━━━━━━━━━━━━━━━',
@@ -1171,6 +1182,16 @@ function buildAdminText(order) {
                 lines.push(`To'lov turi: ${paymentText}`);
                 lines.push(`Yetkazish: ${deliveryText}`);
                 lines.push('');
+                // deliveryFee yo'q bo'lsa deliveryType ga qarab hisobla
+                const fee = o.deliveryFee !== undefined
+                ? o.deliveryFee
+                : (o.deliveryType === 'delivery' ? DELIVERY_FEE : 0);
+                const sub = o.subtotal || (fee ? o.total - fee : o.total);
+                
+                if (o.deliveryType === 'delivery') {
+                    lines.push(`Mahsulotlar: ${formatPrice(sub)}`);
+                    lines.push(`Yetkazib berish: ${formatPrice(fee)}`);
+                }
                 lines.push(`Jami: ${formatPrice(o.total)}`);
                 lines.push(`Vaqt: ${date}`);
                 
