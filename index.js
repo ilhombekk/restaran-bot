@@ -108,7 +108,7 @@ bot.use(
 
 const mainKeyboard = Markup.keyboard([
     ['🛒 Buyurtma berish', '📦 Buyurtmalarim'],
-    ['💬 Fikr bildirish', '⚙️ Sozlamalar']
+    ['💬 Fikr bildirish', 'ℹ️ Qo\'shimcha ma\'lumot']
 ]).resize();
 
 function isAdminChat(ctx) {
@@ -1160,7 +1160,7 @@ function buildAdminText(order) {
             );
         });
         
-        bot.hears('⚙️ Sozlamalar', (ctx) => {
+        bot.hears("ℹ️ Qo'shimcha ma'lumot", (ctx) => {
             return ctx.reply(
                 [
                     'Ajabo Burger',
