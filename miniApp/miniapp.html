@@ -1014,6 +1014,12 @@
                     if (!res.ok) throw new Error('Server xato');
                     
                     // Success
+                    // Jami ni cart tozalanishidan oldin saqlash
+                    const finalTotal = getTotalWithDelivery();
+                    const finalDeliveryFee = getDeliveryFee();
+                    const finalDeliveryType = deliveryType;
+                    const finalPaymentMethod = paymentMethod;
+                    
                     cart = {};
                     updateCartUI();
                     
@@ -1023,12 +1029,16 @@
         <div class="success-title">Buyurtma qabul qilindi!</div>
         <div class="success-sub">
           Tez orada sizga xabar yuboramiz.<br>
-          ${paymentMethod === 'click' ? 'Click to\'lovi uchun bot orqali invoice yuboriladi.' : 'Yetkazib berishda naqd to\'laysiz.'}
+          ${finalPaymentMethod === 'click'
+                    ? "Click to'lovi uchun bot orqali invoice yuboriladi."
+                    : finalDeliveryType === 'pickup'
+                    ? "Olib ketishda naqd to'laysiz."
+                    : "Yetkazib berishda naqd to'laysiz."}
         </div>
         <div class="success-id">#${orderId}</div>
         <div style="margin-top:8px;font-size:14px;color:var(--text2)">
-          Jami: <b>${formatPrice(getTotalWithDelivery())}</b>
-          ${deliveryType === 'delivery' ? `(${formatPrice(DELIVERY_FEE)} yetkazish narxi bilan)` : ''}
+          Jami: <b>${formatPrice(finalTotal)}</b>
+          ${finalDeliveryFee ? `(${formatPrice(finalDeliveryFee)} yetkazish narxi bilan)` : ''}
         </div>
         <button class="order-btn" style="margin-top:24px" onclick="closeModal()">
           Davom etish

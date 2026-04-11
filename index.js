@@ -1140,7 +1140,7 @@ function buildAdminText(order) {
             const myOrders = allOrders
             .filter(o => String(o.userId) === String(ctx.from.id))
             .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-            .slice(0, 5);
+            .slice(0, 3);
             
             if (!myOrders.length) {
                 return ctx.reply(
@@ -1887,6 +1887,11 @@ function buildAdminText(order) {
                 
                 // Naqd bo'lsa oddiy xabar
                 if (order.paymentMethod !== 'click' && order.chatId) {
+                    const isPickupOrder = order.deliveryType === 'pickup';
+                    const payNote = isPickupOrder
+                    ? "Olib ketishda naqd to'laysiz."
+                    : "Yetkazib berishda naqd to'laysiz.";
+                    
                     try {
                         await bot.telegram.sendMessage(
                             order.chatId,
@@ -1896,7 +1901,7 @@ function buildAdminText(order) {
                                 `Buyurtma ID: #${order.id}`,
                                 `Jami: ${formatPrice(order.total)}`,
                                 "",
-                                "Yetkazib berishda naqd to'laysiz."
+                                payNote
                             ].join('\n'),
                             mainKeyboard
                         );
