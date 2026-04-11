@@ -527,6 +527,37 @@ function buildAdminText(order) {
         });
     }
     
+    // Mini App uchun — bot.telegram orqali invoice yuborish (ctx yo'q)
+    async function sendClickInvoiceToUser(chatId, order) {
+        if (!CLICK_PROVIDER_TOKEN) {
+            throw new Error('CLICK_PROVIDER_TOKEN topilmadi');
+        }
+        
+        await bot.telegram.sendInvoice(chatId, {
+            title: `Buyurtma #${order.id}`,
+            description: [
+                `Buyurtma ID: ${order.id}`,
+                `Yetkazish turi: ${getDeliveryTypeText(order.deliveryType)}`,
+                "To'lov turi: Click"
+            ].join('\n'),
+            payload: `order_${order.id}`,
+            provider_token: CLICK_PROVIDER_TOKEN,
+            currency: 'UZS',
+            prices: [
+                {
+                    label: `Buyurtma #${order.id}`,
+                    amount: Math.round(Number(order.total || 0) * 100)
+                }
+            ],
+            start_parameter: `click-order-${order.id}`,
+            need_name: false,
+            need_phone_number: false,
+            need_email: false,
+            need_shipping_address: false,
+            is_flexible: false
+        });
+    }
+    
     // =============================================
     // 10 DAQIQA TO'LOV AMALGA OSHMASA — BEKOR QILISH
     // =============================================
@@ -1766,23 +1797,61 @@ function buildAdminText(order) {
                     sendSseEvent('order_updated', order);
                 }
                 
-                // Click bo'lsa timer ishga tushirish
+                // Click bo'lsa — botga invoice yuborish
                 if (order.paymentMethod === 'click' && order.chatId) {
                     scheduleClickPaymentTimeout(order.id);
                     try {
+                        // Avval xabar yuborish
                         await bot.telegram.sendMessage(
                             order.chatId,
                             [
-                                "Mini App orqali buyurtma qabul qilindi!",
+                                "Buyurtmangiz qabul qilindi!",
                                 "",
                                 `Buyurtma ID: #${order.id}`,
                                 `Jami: ${formatPrice(order.total)}`,
                                 "",
-                                "Click to'lovi uchun 10 daqiqa vaqtingiz bor."
+                                "Click orqali to'lash uchun quyidagi invoice ni to'lang.",
+                                "10 daqiqa ichida to'lanmasa buyurtma bekor bo'ladi."
                             ].join('\n'),
                             mainKeyboard
                         );
-                    } catch {}
+                    } catch (e) {
+                        console.log('Xabar yuborishda xato:', e.message);
+                    }
+                    
+                    // Invoice yuborish
+                    try {
+                        await sendClickInvoiceToUser(order.chatId, order);
+                    } catch (e) {
+                        console.log('Invoice yuborishda xato:', e.message);
+                        try {
+                            await bot.telegram.sendMessage(
+                                order.chatId,
+                                "Click invoice yuborilmadi. Admin bilan bog'laning.",
+                                mainKeyboard
+                            );
+                        } catch {}
+                    }
+                }
+                
+                // Naqd bo'lsa oddiy xabar
+                if (order.paymentMethod !== 'click' && order.chatId) {
+                    try {
+                        await bot.telegram.sendMessage(
+                            order.chatId,
+                            [
+                                "Buyurtmangiz qabul qilindi!",
+                                "",
+                                `Buyurtma ID: #${order.id}`,
+                                `Jami: ${formatPrice(order.total)}`,
+                                "",
+                                "Yetkazib berishda naqd to'laysiz."
+                            ].join('\n'),
+                            mainKeyboard
+                        );
+                    } catch (e) {
+                        console.log('Naqd xabar xato:', e.message);
+                    }
                 }
                 
                 return res.json({ success: true, id: order.id });
