@@ -45,6 +45,7 @@ const WORK_START = process.env.WORK_START || '09:00';
 const WORK_END = process.env.WORK_END || '23:00';
 const PORT = Number(process.env.PORT || 10000);
 const CLICK_PAYMENT_TIMEOUT_MS = 10 * 60 * 1000; // 10 minut
+const MINIAPP_URL = process.env.MINIAPP_URL || 'https://restaran-bot-1.onrender.com/miniapp/miniapp.html';
 
 if (!BOT_TOKEN) {
     throw new Error('BOT_TOKEN topilmadi');
@@ -1076,19 +1077,19 @@ function buildAdminText(order) {
                 return ctx.reply(getClosedText());
             }
             
-            // Yetkazish turi tanlash
-            ctx.session.step = 'delivery_type';
+            // To'g'ridan geo-joylashuv so'rash
+            ctx.session.step = 'location_check';
             return ctx.reply(
                 [
-                    'Buyurtma qanday bo\'ladi?',
+                    '📍 Joylashuvingizni yuboring',
                     '',
-                    '🚚 Yetkazib berish — Shovot tumani bo\'ylab',
-                    "📦 O'zim olib ketaman — Restorandan"
+                    'Biz faqat Shovot tumani (Xorazm viloyati) bo\'ylab yetkazib beramiz.',
+                    'Joylashuvingiz tekshiriladi va buyurtma sahifasi ochiladi.'
                 ].join('\n'),
                 Markup.keyboard([
-                    ['🚚 Yetkazib berish'],
-                    ["📦 O'zim olib ketaman"]
-                ]).resize().oneTime()
+                    [Markup.button.locationRequest('📍 Geo-joylashuvni yuborish')],
+                    ['⬅️ Ortga']
+                ]).resize()
             );
         });
         
@@ -1148,6 +1149,11 @@ function buildAdminText(order) {
         bot.hears('❌ Bekor qilish', (ctx) => {
             ctx.session.step = null;
             return ctx.reply("Bekor qilindi.", mainKeyboard);
+        });
+        
+        bot.hears('⬅️ Ortga', (ctx) => {
+            ctx.session.step = null;
+            return ctx.reply("Bosh sahifaga qaytdingiz.", mainKeyboard);
         });
         
         bot.hears('🍽 Menyu', async (ctx) => {
@@ -1448,41 +1454,34 @@ function buildAdminText(order) {
         bot.on('location', async (ctx) => {
             const { latitude, longitude } = ctx.message.location;
             
-            // location_check — Shovot tekshiruvi, keyin to'lov
+            // location_check — Shovot tekshiruvi, keyin Mini App ochish
             if (ctx.session.step === 'location_check') {
                 if (!isInShovot(latitude, longitude)) {
+                    ctx.session.step = null;
                     return ctx.reply(
                         [
-                            '❌ Kechirasiz!',
+                            '❌ Kechirasiz, buyurtma qabul qilinmadi!',
                             '',
                             'Biz faqat Shovot tumani (Xorazm viloyati) bo\'ylab yetkazib beramiz.',
-                            'Lokatsiyangiz bizning hududimizdan tashqarida.',
+                            'Joylashuvingiz bizning hududimizdan tashqarida.',
                             '',
-                            'Iltimos, Shovot tumani ichidagi manzilingizni yuboring.'
-                        ].join('\n')
+                            'Shovot tumani ichida bo\'lsangiz, qaytadan urinib ko\'ring.'
+                        ].join('\n'),
+                        mainKeyboard
                     );
                 }
                 
-                // Shovot ichida — lokatsiyani saqlab to'lov tanlashga o'tish
-                ctx.session.orderData.location = {
-                    lat: latitude,
-                    lon: longitude,
-                    text: `${latitude}, ${longitude}`
-                };
-                ctx.session.step = 'payment_method';
-                
+                // Shovot ichida — Mini App ochish
+                ctx.session.step = null;
                 return ctx.reply(
                     [
-                        "✅ Manzil tasdiqlandi!",
+                        '✅ Joylashuv tasdiqlandi!',
                         '',
-                        "To'lov usulini tanlang:",
-                        "💵 Naqd — Yetkazib berishda to'laysiz",
-                        "💳 Click — Hoziroq onlayn to'lang"
+                        'Buyurtma berish uchun quyidagi tugmani bosing:'
                     ].join('\n'),
-                    Markup.keyboard([
-                        ['💵 Naqd'],
-                        ['💳 Click']
-                    ]).resize().oneTime()
+                    Markup.inlineKeyboard([
+                        [Markup.button.webApp('🍔 Buyurtma berish', MINIAPP_URL)]
+                    ])
                 );
             }
             
