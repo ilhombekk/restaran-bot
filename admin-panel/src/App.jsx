@@ -825,12 +825,15 @@ function PaymentInfoBox({ order }) {
     const readyOrders = todayOrders.filter((o) => o.status === 'Tayyor').length;
     const deliveredOrders = todayOrders.filter((o) => o.status === 'Yetkazildi').length;
     const cancelledOrders = todayOrders.filter((o) => o.status === 'Bekor qilindi').length;
-    const totalRevenue = todayOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
-    const cashRevenue = todayOrders
+    const activeTodayOrders = todayOrders.filter((o) => o.status !== 'Bekor qilindi');
+    const totalRevenue = activeTodayOrders
+    .filter((o) => o.paymentStatus === 'paid' || (o.paymentMethod || 'cash') === 'cash')
+    .reduce((sum, o) => sum + Number(o.total || 0), 0);
+    const cashRevenue = activeTodayOrders
     .filter((o) => (o.paymentMethod || 'cash') === 'cash')
     .reduce((sum, o) => sum + Number(o.total || 0), 0);
-    const clickRevenue = todayOrders
-    .filter((o) => o.paymentMethod === 'click')
+    const clickRevenue = activeTodayOrders
+    .filter((o) => o.paymentMethod === 'click' && o.paymentStatus === 'paid')
     .reduce((sum, o) => sum + Number(o.total || 0), 0);
     // Naqd + bekor qilinmagan = to'langan; Click + paid = to'langan
     const paidOrders = todayOrders.filter((o) =>
@@ -880,7 +883,12 @@ function buildDailyStats(orders) {
     }
     const item = map.get(key);
     item.totalOrders += 1;
-    item.revenue += Number(order.total || 0);
+    // Faqat bekor qilinmagan va to'langan buyurtmalar tushimga kiradi
+    if (order.status !== 'Bekor qilindi' && (
+      order.paymentStatus === 'paid' || (order.paymentMethod || 'cash') === 'cash'
+    )) {
+      item.revenue += Number(order.total || 0);
+    }
     if ((order.paymentMethod || 'cash') === 'cash') item.cashRevenue += Number(order.total || 0);
     if (order.paymentMethod === 'click') item.clickRevenue += Number(order.total || 0);
     if (order.status !== 'Bekor qilindi' && (

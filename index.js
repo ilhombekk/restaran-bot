@@ -1958,12 +1958,17 @@ function buildAdminText(order) {
             const readyOrders = orders.filter((o) => o.status === 'Tayyor').length;
             const deliveredOrders = orders.filter((o) => o.status === 'Yetkazildi').length;
             const cancelledOrders = orders.filter((o) => o.status === 'Bekor qilindi').length;
-            const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total || 0), 0);
-            const cashRevenue = orders
+            // Faqat bekor qilinmagan buyurtmalar tushimga kiritiladi
+            const activeOrders = orders.filter((o) => o.status !== 'Bekor qilindi');
+            // Click tushumi faqat to'langan bo'lsa kiritiladi
+            const totalRevenue = activeOrders
+            .filter((o) => o.paymentStatus === 'paid' || (o.paymentMethod || 'cash') === 'cash')
+            .reduce((sum, o) => sum + Number(o.total || 0), 0);
+            const cashRevenue = activeOrders
             .filter((o) => (o.paymentMethod || 'cash') === 'cash')
             .reduce((sum, o) => sum + Number(o.total || 0), 0);
-            const clickRevenue = orders
-            .filter((o) => o.paymentMethod === 'click')
+            const clickRevenue = activeOrders
+            .filter((o) => o.paymentMethod === 'click' && o.paymentStatus === 'paid')
             .reduce((sum, o) => sum + Number(o.total || 0), 0);
             const paidOrders = orders.filter((o) =>
                 o.status !== 'Bekor qilindi' && (
