@@ -92,6 +92,74 @@ function playNotificationSound() {
   } catch {}
 }
 
+// ===== TAB NOTIFICATION =====
+let newOrderCount = 0;
+let originalTitle = 'Admin Panel';
+let titleBlinkInterval = null;
+
+function setFaviconBadge(count) {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 32; canvas.height = 32;
+    const ctx = canvas.getContext('2d');
+    
+    // Burger emoji asos
+    ctx.font = '22px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🍔', 16, 16);
+    
+    if (count > 0) {
+      // Qizil doira
+      ctx.beginPath();
+      ctx.arc(26, 6, 9, 0, 2 * Math.PI);
+      ctx.fillStyle = '#ef4444';
+      ctx.fill();
+      
+      // Raqam
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 11px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(count > 9 ? '9+' : String(count), 26, 6);
+    }
+    
+    // Faviconni yangilash
+    let link = document.querySelector("link[rel~='icon']");
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    link.href = canvas.toDataURL();
+  } catch {}
+}
+
+function startTabBlink(count) {
+  newOrderCount = count;
+  setFaviconBadge(count);
+  
+  // Tab sarlavhasini miltillatish
+  if (titleBlinkInterval) clearInterval(titleBlinkInterval);
+  let blink = false;
+  titleBlinkInterval = setInterval(() => {
+    document.title = blink
+    ? `(${count}) Yangi buyurtma!`
+    : `🔴 (${count}) Admin Panel`;
+    blink = !blink;
+  }, 800);
+}
+
+function clearTabNotification() {
+  newOrderCount = 0;
+  setFaviconBadge(0);
+  if (titleBlinkInterval) {
+    clearInterval(titleBlinkInterval);
+    titleBlinkInterval = null;
+  }
+  document.title = originalTitle;
+}
+
 // Brauzer Push Notification
 function requestNotificationPermission() {
   if (!('Notification' in window)) return;
@@ -1075,9 +1143,15 @@ export default function App() {
         const hasNewOrder = incomingIds.some((id) => !knownIds.has(id));
         if (hasNewOrder && knownIds.size > 0) {
           playNotificationSound();
-          // Yangi buyurtmani topib notification chiqarish
+          // Yangi buyurtmalarni topish
           const newOrders = safeOrders.filter(o => !knownIds.has(String(o.id)));
+          // Brauzer notification
           newOrders.forEach(order => showBrowserNotification(order));
+          // Tab notification - yangi buyurtmalar soni
+          const activeNewCount = safeOrders.filter(o =>
+            o.status !== 'Yetkazildi' && o.status !== 'Bekor qilindi'
+          ).length;
+          startTabBlink(newOrders.length);
         }
         notifiedOrderIdsRef.current = new Set(incomingIds);
       } else if (notifiedOrderIdsRef.current.size === 0) {
@@ -1127,6 +1201,13 @@ export default function App() {
   useEffect(() => {
     if (!isMobile) setSidebarOpen(false);
   }, [isMobile]);
+  
+  // Oyna focusga kelganda tab notificationni tozalash
+  useEffect(() => {
+    const onFocus = () => clearTabNotification();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
   
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -1196,6 +1277,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       });
+      clearTabNotification();
       await loadData();
     } catch (error) {
       console.error('Statusni yangilashda xato:', error);
