@@ -92,6 +92,42 @@ function playNotificationSound() {
   } catch {}
 }
 
+// Brauzer Push Notification
+function requestNotificationPermission() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+function showBrowserNotification(order) {
+  if (!('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+  
+  const title = `🆕 Yangi buyurtma #${order.id}`;
+  const body = [
+    `👤 ${order.name || 'Mijoz'}`,
+    `💰 ${new Intl.NumberFormat('uz-UZ').format(Number(order.total || 0))} so'm`,
+    `📦 ${order.deliveryType === 'pickup' ? "O'zi olib ketadi" : 'Yetkazib berish'}`,
+    `💳 ${order.paymentMethod === 'click' ? 'Click' : 'Naqd'}`,
+  ].join('\n');
+  
+  try {
+    const notification = new Notification(title, {
+      body,
+      icon: 'https://cdn-icons-png.flaticon.com/512/3075/3075977.png',
+      badge: 'https://cdn-icons-png.flaticon.com/512/3075/3075977.png',
+      tag: `order-${order.id}`,
+      requireInteraction: true, // Foydalanuvchi yopguncha ko'rinadi
+    });
+    
+    notification.onclick = () => {
+      window.focus();
+      notification.close();
+    };
+  } catch {}
+}
+
 function getPaymentMethodText(paymentMethod) {
   return paymentMethod === 'click' ? 'Click' : 'Naqd';
 }
@@ -1037,7 +1073,12 @@ export default function App() {
         const incomingIds = safeOrders.map((order) => String(order.id));
         const knownIds = notifiedOrderIdsRef.current;
         const hasNewOrder = incomingIds.some((id) => !knownIds.has(id));
-        if (hasNewOrder && knownIds.size > 0) playNotificationSound();
+        if (hasNewOrder && knownIds.size > 0) {
+          playNotificationSound();
+          // Yangi buyurtmani topib notification chiqarish
+          const newOrders = safeOrders.filter(o => !knownIds.has(String(o.id)));
+          newOrders.forEach(order => showBrowserNotification(order));
+        }
         notifiedOrderIdsRef.current = new Set(incomingIds);
       } else if (notifiedOrderIdsRef.current.size === 0) {
         notifiedOrderIdsRef.current = new Set(safeOrders.map((order) => String(order.id)));
@@ -1065,6 +1106,9 @@ export default function App() {
   }
   
   useEffect(() => {
+    // Brauzer notification ruxsati so'rash
+    requestNotificationPermission();
+    
     loadData();
     const streamUrl = `${API.replace(/\/api$/, '')}/api/stream`;
     const eventSource = new EventSource(streamUrl);
@@ -1384,7 +1428,30 @@ export default function App() {
       {streamStatus}
       </div>
       </div>
-      <div style={{ position: 'relative', width: 280, flexShrink: 0 }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+      {/* Notification ruxsat tugmasi */}
+      {typeof Notification !== 'undefined' && Notification.permission !== 'granted' && (
+        <button
+        onClick={() => Notification.requestPermission()}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '10px 14px', borderRadius: 14,
+          border: '1px solid #fde68a', background: '#fffbeb',
+          color: '#b45309', fontWeight: 700, fontSize: 13,
+          cursor: 'pointer', flexShrink: 0,
+        }}
+        title="Yangi buyurtma xabarnomalarini yoqish"
+        >
+        <Bell size={16} />
+        Xabarnomalarni yoqish
+        </button>
+      )}
+      {typeof Notification !== 'undefined' && Notification.permission === 'granted' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#047857', fontWeight: 700 }}>
+        <Bell size={15} /> Xabarnomalar yoqilgan
+        </div>
+      )}
+      <div style={{ position: 'relative', width: 280 }}>
       <Search size={16} style={{ position: 'absolute', left: 12, top: 14, color: '#94a3b8' }} />
       <Input
       value={search}
@@ -1392,6 +1459,7 @@ export default function App() {
       placeholder="Qidirish..."
       style={{ paddingLeft: 36 }}
       />
+      </div>
       </div>
       </div>
       </Card>
