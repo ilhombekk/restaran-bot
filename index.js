@@ -1125,7 +1125,6 @@ function buildAdminText(order) {
         });
         
         bot.hears('📦 Buyurtmalarim', async (ctx) => {
-            // Foydalanuvchining so'nggi buyurtmasini ko'rsatish
             const allOrders = getAllOrders();
             const myOrders = allOrders
             .filter(o => String(o.userId) === String(ctx.from.id))
@@ -1134,22 +1133,53 @@ function buildAdminText(order) {
             
             if (!myOrders.length) {
                 return ctx.reply(
-                    "Sizda hali buyurtma yo'q.\n\nBuyurtma berish uchun 🛒 Buyurtma berish tugmasini bosing.",
+                    "Siz hali buyurtma bermagansiz.\n\n🛒 Buyurtma berish tugmasini bosing!",
                     mainKeyboard
                 );
             }
             
-            const text = myOrders.map((o, i) => [
-                `${i + 1}. Buyurtma #${o.id}`,
-                `   Holat: ${o.status}`,
-                `   Jami: ${formatPrice(o.total)}`,
-                `   Vaqt: ${new Date(o.createdAt).toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })}`
-            ].join('\n')).join('\n\n');
+            // Har bir buyurtmani alohida xabar sifatida yuborish
+            for (const o of myOrders) {
+                const items = typeof o.cartText === 'string'
+                ? o.cartText.split('\n').filter(l => l.trim() && l.trim() !== '🛒 Savat:' && l !== 'Savat:')
+                : [];
+                
+                const manzil = o.location?.text || "Manzil yo'q";
+                const date = new Date(o.createdAt).toLocaleString('uz-UZ', {
+                    timeZone: 'Asia/Tashkent',
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                const paymentText = o.paymentMethod === 'click' ? 'Click' : 'Naqd';
+                const deliveryText = o.deliveryType === 'pickup' ? "O'zi olib ketadi" : 'Yetkazib berish';
+                
+                const lines = [
+                    `Buyurtma raqami: ${o.id}`,
+                    `Status: ${o.status}`,
+                    `Manzil: ${manzil}`,
+                    '',
+                ];
+                
+                // Mahsulotlar
+                items.forEach(item => lines.push(item));
+                
+                lines.push('');
+                lines.push(`To'lov turi: ${paymentText}`);
+                lines.push(`Yetkazish: ${deliveryText}`);
+                lines.push('');
+                lines.push(`Jami: ${formatPrice(o.total)}`);
+                lines.push(`Vaqt: ${date}`);
+                
+                try {
+                    await ctx.reply(lines.join('\n'));
+                } catch {}
+            }
             
-            return ctx.reply(
-                "So'nggi buyurtmalaringiz:\n\n" + text,
-                mainKeyboard
-            );
+            return;
         });
         
         bot.hears('💬 Fikr bildirish', (ctx) => {

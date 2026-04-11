@@ -646,7 +646,8 @@
     </div>
     
     <script>
-        const API = 'https://restaran-bot-1.onrender.com/api';
+        const API = 'https://YOUR_API_URL/api'; // <-- O'zgartiring!
+        const DELIVERY_FEE = 12000; // Yetkazib berish narxi
         
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -812,6 +813,14 @@
                 return getCartItems().reduce((sum, i) => sum + i.total, 0);
             }
             
+            function getDeliveryFee() {
+                return deliveryType === 'delivery' ? DELIVERY_FEE : 0;
+            }
+            
+            function getTotalWithDelivery() {
+                return getCartTotal() + getDeliveryFee();
+            }
+            
             function getCartCount() {
                 return Object.values(cart).reduce((sum, q) => sum + q, 0);
             }
@@ -878,9 +887,20 @@
                 openModal(`
     <div class="modal-title">🛒 Savat</div>
     ${itemsHtml}
-    <div class="cart-total-row">
-      <span class="cart-total-label">Jami:</span>
-      <span class="cart-total-amount">${formatPrice(getCartTotal())}</span>
+    <div class="cart-total-row" style="flex-direction:column;align-items:flex-start;gap:4px">
+      <div style="display:flex;justify-content:space-between;width:100%">
+        <span style="font-size:14px;color:var(--text2)">Mahsulotlar:</span>
+        <span style="font-size:14px;font-weight:700">${formatPrice(getCartTotal())}</span>
+      </div>
+      ${deliveryType === 'delivery' ? `
+      <div style="display:flex;justify-content:space-between;width:100%">
+        <span style="font-size:14px;color:var(--text2)">Yetkazib berish:</span>
+        <span style="font-size:14px;font-weight:700;color:var(--accent)">${formatPrice(DELIVERY_FEE)}</span>
+      </div>` : ''}
+      <div style="display:flex;justify-content:space-between;width:100%;margin-top:4px;padding-top:8px;border-top:1px solid var(--border)">
+        <span class="cart-total-label">Jami:</span>
+        <span class="cart-total-amount">${formatPrice(getTotalWithDelivery())}</span>
+      </div>
     </div>
     <div class="divider"></div>
 
@@ -919,7 +939,7 @@
       </div>
 
       <button class="order-btn" onclick="submitOrder()" id="orderBtn">
-        Buyurtma berish — ${formatPrice(getCartTotal())}
+        Buyurtma berish — ${formatPrice(getTotalWithDelivery())}
       </button>
     </div>
   `);
@@ -973,7 +993,9 @@
                     location: deliveryType === 'delivery' ? { text: address } : { text: "O'zi olib ketadi" },
                     cart: Object.fromEntries(items.map(i => [i.key, i.qty])),
                     cartText,
-                    total: getCartTotal(),
+                    subtotal: getCartTotal(),
+                    deliveryFee: getDeliveryFee(),
+                    total: getTotalWithDelivery(),
                     status: 'Yangi buyurtma',
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
@@ -1004,6 +1026,10 @@
           ${paymentMethod === 'click' ? 'Click to\'lovi uchun bot orqali invoice yuboriladi.' : 'Yetkazib berishda naqd to\'laysiz.'}
         </div>
         <div class="success-id">#${orderId}</div>
+        <div style="margin-top:8px;font-size:14px;color:var(--text2)">
+          Jami: <b>${formatPrice(getTotalWithDelivery())}</b>
+          ${deliveryType === 'delivery' ? `(${formatPrice(DELIVERY_FEE)} yetkazish narxi bilan)` : ''}
+        </div>
         <button class="order-btn" style="margin-top:24px" onclick="closeModal()">
           Davom etish
         </button>
