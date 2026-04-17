@@ -45,7 +45,7 @@ const WORK_START = process.env.WORK_START || '09:00';
 const WORK_END = process.env.WORK_END || '23:00';
 const PORT = Number(process.env.PORT || 10000);
 const CLICK_PAYMENT_TIMEOUT_MS = 10 * 60 * 1000; // 10 minut
-const DELIVERY_FEE = 12000; // Yetkazib berish narxi
+const DELIVERY_FEE = 0; // Masofaga qarab - admin belgilaydi
 const MINIAPP_URL = process.env.MINIAPP_URL || 'https://restaran-bot-1.onrender.com/miniapp/miniapp.html';
 
 if (!BOT_TOKEN) {
@@ -340,8 +340,12 @@ function buildAdminText(order) {
             '',
             order.cartText,
             `Mahsulotlar: ${formatPrice(order.subtotal || order.total)}`,
-            ...(order.deliveryFee ? [`Yetkazib berish: ${formatPrice(order.deliveryFee)}`] : []),
-            `Jami: ${formatPrice(order.total)}`,
+            ...(order.deliveryType !== 'pickup' ? [
+                order.deliveryFee
+                ? `Yo'l haqi: ${formatPrice(order.deliveryFee)}`
+                : "Yo'l haqi: Belgilanmagan"
+            ] : []),
+            `Jami: ${formatPrice(Number(order.total || 0) + Number(order.deliveryFee || 0))}`,
             ...(order.clickTransactionId ? [`Click transaction: ${order.clickTransactionId}`] : []),
             ...(order.paidAt ? [`To'langan vaqt: ${new Date(order.paidAt).toLocaleString('uz-UZ', { timeZone: TIME_ZONE })}`] : []),
             '',
@@ -675,7 +679,7 @@ function buildAdminText(order) {
         }
         
         const selectedDeliveryType = ctx.session.orderData.deliveryType || 'delivery';
-        const deliveryFee = selectedDeliveryType === 'delivery' ? DELIVERY_FEE : 0;
+        const deliveryFee = 0; // Admin masofaga qarab belgilaydi
         const total = cartSubtotal + deliveryFee;
         
         const cartText = getCartText(ctx.session.cart);
@@ -1944,6 +1948,54 @@ function buildAdminText(order) {
                 return res.json(updated);
             } catch (error) {
                 return res.status(404).json({ error: error.message });
+            }
+        });
+        
+        // Admin yo'l haqini belgilash
+        app.put('/api/orders/:id/delivery-fee', async (req, res) => {
+            const id = req.params.id;
+            const { deliveryFee } = req.body;
+            
+            if (deliveryFee === undefined || isNaN(Number(deliveryFee))) {
+                return res.status(400).json({ error: 'deliveryFee kerak' });
+            }
+            
+            try {
+                const order = getOrderById(id);
+                if (!order) return res.status(404).json({ error: 'Buyurtma topilmadi' });
+                
+                const fee = Number(deliveryFee);
+                const newTotal = Number(order.subtotal || order.total) + fee;
+                
+                const updated = await updateOrderPayment(id, {
+                    deliveryFee: fee,
+                    total: newTotal
+                });
+                
+                sendSseEvent('order_updated', updated);
+                await syncAdminOrderMessage(updated);
+                
+                // Mijozga xabar
+                if (updated.chatId) {
+                    try {
+                        await bot.telegram.sendMessage(
+                            updated.chatId,
+                            [
+                                "Buyurtmangiz uchun yo'l haqi belgilandi!",
+                                "",
+                                `Buyurtma ID: #${updated.id}`,
+                                `Mahsulotlar: ${formatPrice(updated.subtotal || (newTotal - fee))}`,
+                                `Yo'l haqi: ${formatPrice(fee)}`,
+                                `Jami: ${formatPrice(newTotal)}`
+                            ].join('\n'),
+                            mainKeyboard
+                        );
+                    } catch {}
+                }
+                
+                return res.json(updated);
+            } catch (error) {
+                return res.status(500).json({ error: error.message });
             }
         });
         

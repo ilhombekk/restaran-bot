@@ -507,6 +507,74 @@ function InfoLine({ icon: Icon, text, link }) {
   );
 }
 
+// Yo'l haqi belgilash komponenti (faqat delivery)
+function DeliveryFeeBox({ order, onDeliveryFeeUpdate }) {
+  const [fee, setFee] = React.useState(order.deliveryFee ? String(order.deliveryFee) : '');
+  const [saving, setSaving] = React.useState(false);
+  
+  if (order.deliveryType === 'pickup') return null;
+  
+  const hasFee = order.deliveryFee > 0;
+  
+  return (
+    <div style={{
+      padding: 16, borderRadius: 18,
+      background: hasFee ? '#f0fdf4' : '#fffbeb',
+      border: `1px solid ${hasFee ? '#a7f3d0' : '#fde68a'}`,
+    }}>
+    <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
+    🚗 Yo'l haqi
+    </div>
+    {hasFee ? (
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <span style={{ fontSize: 16, fontWeight: 800, color: '#047857' }}>
+      {new Intl.NumberFormat('uz-UZ').format(order.deliveryFee)} so'm
+      </span>
+      <button
+      onClick={() => { setFee(String(order.deliveryFee)); }}
+      style={{ fontSize: 12, color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+      >
+      O'zgartirish
+      </button>
+      </div>
+    ) : (
+      <div style={{ fontSize: 13, color: '#b45309', fontWeight: 600, marginBottom: 10 }}>
+      Masofaga qarab belgilanadi
+      </div>
+    )}
+    <div style={{ display: 'flex', gap: 8, marginTop: hasFee ? 8 : 0 }}>
+    <input
+    type="number"
+    value={fee}
+    onChange={(e) => setFee(e.target.value)}
+    placeholder="Masalan: 12000"
+    style={{
+      flex: 1, padding: '9px 12px', borderRadius: 12,
+      border: '1px solid #dbe2ea', outline: 'none',
+      fontSize: 14, fontWeight: 600,
+    }}
+    />
+    <button
+    disabled={saving || !fee}
+    onClick={async () => {
+      setSaving(true);
+      await onDeliveryFeeUpdate(order.id, Number(fee));
+      setSaving(false);
+    }}
+    style={{
+      padding: '9px 14px', borderRadius: 12, border: 'none',
+      background: fee ? '#0f172a' : '#e2e8f0',
+      color: fee ? '#fff' : '#94a3b8',
+      fontWeight: 700, fontSize: 13, cursor: fee ? 'pointer' : 'not-allowed',
+    }}
+    >
+    {saving ? '...' : 'Saqlash'}
+    </button>
+    </div>
+    </div>
+  );
+}
+
 // To'lov ma'lumotlari ko'rsatish komponenti
 function PaymentInfoBox({ order }) {
   const isClick = order.paymentMethod === 'click';
@@ -627,6 +695,7 @@ function PaymentInfoBox({ order }) {
     order,
     onStatusChange,
     onDeleteOrder,
+    onDeliveryFeeUpdate,
     hideActions = false,
     isMobile = false,
     isTablet = false,
@@ -761,6 +830,8 @@ function PaymentInfoBox({ order }) {
         )}
         </div>
         
+        {/* Yo'l haqi */}
+        <DeliveryFeeBox order={order} onDeliveryFeeUpdate={onDeliveryFeeUpdate} />
         {/* To'lov ma'lumotlari */}
         <PaymentInfoBox order={order} />
         
@@ -863,8 +934,9 @@ function PaymentInfoBox({ order }) {
         </div>
         </div>
         
-        {/* 3-ustun: To'lov + Buyurtma boshqaruvi */}
+        {/* 3-ustun: To'lov + Yo'l haqi + Buyurtma boshqaruvi */}
         <div style={{ display: 'grid', gap: 14 }}>
+        <DeliveryFeeBox order={order} onDeliveryFeeUpdate={onDeliveryFeeUpdate} />
         <PaymentInfoBox order={order} />
         
         {!hideActions ? (
@@ -1284,6 +1356,19 @@ export default function App() {
     }
   }
   
+  async function handleDeliveryFeeUpdate(id, fee) {
+    try {
+      await fetch(`${API}/orders/${id}/delivery-fee`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deliveryFee: fee }),
+      });
+      await loadData();
+    } catch (error) {
+      console.error("Yo'l haqini belgilashda xato:", error);
+    }
+  }
+  
   async function handleDeleteOrder(id) {
     const ok = window.confirm("Rostdan ham bu buyurtmani o'chirmoqchimisiz?");
     if (!ok) return;
@@ -1603,6 +1688,7 @@ export default function App() {
         order={order}
         onStatusChange={handleStatusChange}
         onDeleteOrder={handleDeleteOrder}
+        onDeliveryFeeUpdate={handleDeliveryFeeUpdate}
         isMobile={isMobile}
         isTablet={isTablet}
         />
@@ -1641,6 +1727,7 @@ export default function App() {
         order={order}
         onStatusChange={handleStatusChange}
         onDeleteOrder={handleDeleteOrder}
+        onDeliveryFeeUpdate={handleDeliveryFeeUpdate}
         hideActions={orderTab === 'history'}
         isMobile={isMobile}
         isTablet={isTablet}
