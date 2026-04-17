@@ -1892,21 +1892,31 @@ function buildAdminText(order) {
                 // Naqd bo'lsa oddiy xabar
                 if (order.paymentMethod !== 'click' && order.chatId) {
                     const isPickupOrder = order.deliveryType === 'pickup';
-                    const payNote = isPickupOrder
-                    ? "Olib ketishda naqd to'laysiz."
-                    : "Yetkazib berishda naqd to'laysiz.";
+                    
+                    const msgLines = isPickupOrder
+                    ? [
+                        "Buyurtmangiz qabul qilindi!",
+                        "",
+                        `Buyurtma ID: #${order.id}`,
+                        `Jami: ${formatPrice(order.total)}`,
+                        "",
+                        "Olib ketishda naqd to'laysiz."
+                    ]
+                    : [
+                        "Buyurtmangiz qabul qilindi!",
+                        "",
+                        `Buyurtma ID: #${order.id}`,
+                        `Mahsulotlar: ${formatPrice(order.total)}`,
+                        "",
+                        "Yetkazib berish xaqi restoran xodimlari tomonidan belgilanadi va sizga xabar beramiz.",
+                        "",
+                        "Jami summa yo'l haqi belgilangandan so'ng ma'lum bo'ladi."
+                    ];
                     
                     try {
                         await bot.telegram.sendMessage(
                             order.chatId,
-                            [
-                                "Buyurtmangiz qabul qilindi!",
-                                "",
-                                `Buyurtma ID: #${order.id}`,
-                                `Jami: ${formatPrice(order.total)}`,
-                                "",
-                                payNote
-                            ].join('\n'),
+                            msgLines.join('\n'),
                             mainKeyboard
                         );
                     } catch (e) {
@@ -1986,7 +1996,9 @@ function buildAdminText(order) {
                                 `Buyurtma ID: #${updated.id}`,
                                 `Mahsulotlar: ${formatPrice(updated.subtotal || (newTotal - fee))}`,
                                 `Yo'l haqi: ${formatPrice(fee)}`,
-                                `Jami: ${formatPrice(newTotal)}`
+                                `Jami: ${formatPrice(newTotal)}`,
+                                "",
+                                "Agar ko'rsatilgan summadan qo'shimcha haq so'ralsa, bizga murojat qiling."
                             ].join('\n'),
                             mainKeyboard
                         );
