@@ -511,6 +511,7 @@ function InfoLine({ icon: Icon, text, link }) {
 function DeliveryFeeBox({ order, onDeliveryFeeUpdate }) {
   const [fee, setFee] = React.useState(order.deliveryFee ? String(order.deliveryFee) : '');
   const [saving, setSaving] = React.useState(false);
+  const [saved, setSaved] = React.useState(false);
   
   if (order.deliveryType === 'pickup') return null;
   
@@ -522,55 +523,65 @@ function DeliveryFeeBox({ order, onDeliveryFeeUpdate }) {
       background: hasFee ? '#f0fdf4' : '#fffbeb',
       border: `1px solid ${hasFee ? '#a7f3d0' : '#fde68a'}`,
     }}>
-    <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
+    <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
     🚗 Yo'l haqi
     </div>
     {hasFee ? (
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
       <span style={{ fontSize: 16, fontWeight: 800, color: '#047857' }}>
       {new Intl.NumberFormat('uz-UZ').format(order.deliveryFee)} so'm
       </span>
       <button
-      onClick={() => { setFee(String(order.deliveryFee)); }}
+      onClick={() => { setFee(String(order.deliveryFee)); setSaved(false); }}
       style={{ fontSize: 12, color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
       >
       O'zgartirish
       </button>
       </div>
     ) : (
-      <div style={{ fontSize: 13, color: '#b45309', fontWeight: 600, marginBottom: 10 }}>
-      Masofaga qarab belgilanadi
+      <div style={{ fontSize: 12, color: '#b45309', fontWeight: 600, marginBottom: 8 }}>
+      Yo'l haqini belgilang
       </div>
     )}
-    <div style={{ display: 'flex', gap: 8, marginTop: hasFee ? 8 : 0 }}>
-    <input
-    type="number"
-    value={fee}
-    onChange={(e) => setFee(e.target.value)}
-    placeholder="Masalan: 12000"
-    style={{
-      flex: 1, padding: '9px 12px', borderRadius: 12,
-      border: '1px solid #dbe2ea', outline: 'none',
-      fontSize: 14, fontWeight: 600,
-    }}
-    />
-    <button
-    disabled={saving || !fee}
-    onClick={async () => {
-      setSaving(true);
-      await onDeliveryFeeUpdate(order.id, Number(fee));
-      setSaving(false);
-    }}
-    style={{
-      padding: '9px 14px', borderRadius: 12, border: 'none',
-      background: fee ? '#0f172a' : '#e2e8f0',
-      color: fee ? '#fff' : '#94a3b8',
-      fontWeight: 700, fontSize: 13, cursor: fee ? 'pointer' : 'not-allowed',
-    }}
-    >
-    {saving ? '...' : 'Saqlash'}
-    </button>
-    </div>
+    {saved ? (
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#047857', padding: '8px 0' }}>
+      Saqlandi!
+      </div>
+    ) : (
+      <div style={{ display: 'flex', gap: 8 }}>
+      <input
+      type="number"
+      value={fee}
+      onChange={(e) => setFee(e.target.value)}
+      placeholder="Yo'l haqini kiriting"
+      style={{
+        flex: 1, padding: '9px 12px', borderRadius: 12,
+        border: '1px solid #dbe2ea', outline: 'none',
+        fontSize: 14, fontWeight: 600,
+      }}
+      />
+      <button
+      disabled={saving || !fee}
+      onClick={async () => {
+        setSaving(true);
+        await onDeliveryFeeUpdate(order.id, Number(fee));
+        setSaving(false);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      }}
+      style={{
+        padding: '9px 14px', borderRadius: 12, border: 'none',
+        background: fee ? '#0f172a' : '#e2e8f0',
+        color: fee ? '#fff' : '#94a3b8',
+        fontWeight: 700, fontSize: 13,
+        cursor: fee ? 'pointer' : 'not-allowed',
+        whiteSpace: 'nowrap',
+      }}
+      >
+      {saving ? '...' : 'Saqlash'}
+      </button>
+      </div>
+    )}
     </div>
   );
 }

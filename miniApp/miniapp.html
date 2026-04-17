@@ -658,6 +658,7 @@
         }
         
         let allProducts = [];
+        let categoryOrder = []; // [{category, order}]
         let cart = {}; // { key: qty }
         let activeCategory = 'all';
         let searchQuery = '';
@@ -670,10 +671,16 @@
         // ===== LOAD MENU =====
         async function loadMenu(retryCount = 0) {
             try {
-                const res = await fetch(`${API}/menu`, { signal: AbortSignal.timeout(15000) });
-                if (!res.ok) throw new Error('Server xato');
-                const data = await res.json();
+                const [menuRes, catRes] = await Promise.all([
+                fetch(`${API}/menu`, { signal: AbortSignal.timeout(15000) }),
+                fetch(`${API}/categories`).catch(() => null)
+                ]);
+                if (!menuRes.ok) throw new Error('Server xato');
+                const data = await menuRes.json();
                 allProducts = Object.values(data || {}).filter(p => p.active);
+                if (catRes && catRes.ok) {
+                    categoryOrder = await catRes.json();
+                }
                 renderCategories();
                 renderProducts();
             } catch (e) {
@@ -700,7 +707,14 @@
         
         // ===== CATEGORIES =====
         function renderCategories() {
-            const categories = [...new Set(allProducts.map(p => p.category).filter(Boolean))];
+            const rawCats = [...new Set(allProducts.map(p => p.category).filter(Boolean))];
+            
+            // categoryOrder bo'yicha saralash
+            const categories = rawCats.sort((a, b) => {
+                const oa = categoryOrder.find(c => c.category === a)?.order ?? 9999;
+                const ob = categoryOrder.find(c => c.category === b)?.order ?? 9999;
+                return oa - ob;
+            });
             const row = document.getElementById('categoriesRow');
             row.innerHTML = `<button class="cat-chip ${activeCategory==='all'?'active':''}" onclick="selectCategory('all')">Hammasi</button>`;
             categories.forEach(cat => {
@@ -876,7 +890,7 @@
             
             // ===== CART MODAL =====
             let deliveryType = 'delivery';
-            let paymentMethod = 'cash';
+            const paymentMethod = 'cash'; // Faqat naqd
             
             function openCart() {
                 const items = getCartItems();
@@ -910,7 +924,7 @@
       ${deliveryType === 'delivery' ? `
       <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
         <span style="font-size:14px;color:var(--text2)">Yetkazib berish:</span>
-        <span style="font-size:12px;font-weight:700;color:var(--primary-light);font-style:italic">Yo'l haqi masofa (buyurtma) ga qarab belgilanadi</span>
+        <span style="font-size:11px;font-weight:700;color:var(--primary-light);font-style:italic;white-space:nowrap">Masofaga qarab belgilanadi</span>
       </div>` : ''}
       <div style="display:flex;justify-content:space-between;width:100%;margin-top:4px;padding-top:8px;border-top:1px solid var(--border)">
         <span class="cart-total-label">Jami:</span>
@@ -934,23 +948,11 @@
         </div>
       </div>
 
-      <span class="form-label">To'lov usuli</span>
-      <div class="option-group">
-        <div class="option-btn ${paymentMethod==='cash'?'active':''}" onclick="setPayment('cash')">
-          <span class="opt-icon">💵</span>
-          <div class="opt-label">Naqd</div>
-          <div class="opt-sub">Yetkazishda</div>
-        </div>
-        <div class="option-btn ${paymentMethod==='click'?'active':''}" onclick="setPayment('click')">
-          <span class="opt-icon">💳</span>
-          <div class="opt-label">Click</div>
-          <div class="opt-sub">Onlayn</div>
-        </div>
-      </div>
+
 
       <div id="addressSection" style="${deliveryType==='delivery'?'':'display:none'}">
         <span class="form-label">Manzil</span>
-        <textarea class="address-input" id="addressInput" rows="2" placeholder="Ko'cha, uy raqami..."></textarea>
+        <textarea class="address-input" id="addressInput" rows="2" placeholder="Masalan: Stansa paxta zavod ko'chasi, Moskva Lenin maktab..."></textarea>
       </div>
 
       <button class="order-btn" onclick="submitOrder()" id="orderBtn">

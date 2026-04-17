@@ -1747,6 +1747,11 @@ function buildAdminText(order) {
             return res.json(getMenu());
         });
         
+        // Kategoriya tartibi
+        app.get('/api/categories', async (req, res) => {
+            return res.json(getCategoryOrders());
+        });
+        
         app.post('/api/menu', async (req, res) => {
             const { key, name, price, category, image } = req.body;
             
@@ -1982,8 +1987,10 @@ function buildAdminText(order) {
                     total: newTotal
                 });
                 
-                sendSseEvent('order_updated', updated);
-                await syncAdminOrderMessage(updated);
+                // DB dan yangilangan order ni qayta o'qish
+                const freshOrder = getOrderById(id);
+                sendSseEvent('order_updated', freshOrder || updated);
+                await syncAdminOrderMessage(freshOrder || updated);
                 
                 // Mijozga xabar
                 if (updated.chatId) {
