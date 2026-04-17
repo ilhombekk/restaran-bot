@@ -668,19 +668,33 @@
         }
         
         // ===== LOAD MENU =====
-        async function loadMenu() {
+        async function loadMenu(retryCount = 0) {
             try {
-                const res = await fetch(`${API}/menu`);
+                const res = await fetch(`${API}/menu`, { signal: AbortSignal.timeout(15000) });
+                if (!res.ok) throw new Error('Server xato');
                 const data = await res.json();
                 allProducts = Object.values(data || {}).filter(p => p.active);
                 renderCategories();
                 renderProducts();
             } catch (e) {
-                document.getElementById('mainContent').innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">😔</div>
-        <p>Menyu yuklanmadi.<br>Qaytadan urinib ko'ring.</p>
-      </div>`;
+                if (retryCount < 2) {
+                    // Server uyqu holatida — 3 soniya kutib qayta urish
+                    document.getElementById('mainContent').innerHTML = `
+        <div class="loading">
+          <div class="spinner"></div>
+          <p style="color:var(--text3);font-weight:700;">Server uyg'onmoqda... (${retryCount + 1}/3)</p>
+        </div>`;
+                    setTimeout(() => loadMenu(retryCount + 1), 3000);
+                } else {
+                    document.getElementById('mainContent').innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">😔</div>
+          <p>Menyu yuklanmadi.<br>
+          <button onclick="loadMenu()" style="margin-top:12px;padding:10px 20px;border-radius:12px;border:none;background:var(--primary);color:#fff;font-weight:700;cursor:pointer;font-size:14px">
+            Qaytadan urinish
+          </button></p>
+        </div>`;
+                }
             }
         }
         
@@ -1024,22 +1038,28 @@
                     cart = {};
                     updateCartUI();
                     
+                    let payNote = '';
+                    if (finalPaymentMethod === 'click') {
+                        payNote = 'Click orqali invoice bot da yuboriladi.';
+                    } else if (finalDeliveryType === 'pickup') {
+                        payNote = 'Olib ketishda naqd to`laysiz.';
+                    } else {
+                        payNote = 'Yetkazib berishda naqd to`laysiz.';
+                    }
+                    const deliveryNote = finalDeliveryType === 'delivery' ? '(+ yo`l haqi qo`shiladi)' : '';
+                    
                     document.getElementById('modalContent').innerHTML = `
       <div class="success-screen">
         <span class="success-icon">🎉</span>
         <div class="success-title">Buyurtma qabul qilindi!</div>
         <div class="success-sub">
           Tez orada sizga xabar yuboramiz.<br>
-          ${finalPaymentMethod === 'click'
-                    ? "Click to'lovi uchun bot orqali invoice yuboriladi."
-                    : finalDeliveryType === 'pickup'
-                    ? "Olib ketishda naqd to'laysiz."
-                    : "Yetkazib berishda naqd to'laysiz."}
+          ${payNote}
         </div>
         <div class="success-id">#${orderId}</div>
         <div style="margin-top:8px;font-size:14px;color:var(--text2)">
           Jami: <b>${formatPrice(finalTotal)}</b>
-          ${finalDeliveryType === 'delivery' ? '(+ yo'l haqi qo'shiladi)' : ''}
+          ${deliveryNote}
         </div>
         <button class="order-btn" style="margin-top:24px" onclick="closeModal()">
           Davom etish
