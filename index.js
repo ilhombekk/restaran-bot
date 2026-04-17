@@ -1752,6 +1752,21 @@ function buildAdminText(order) {
             return res.json(getCategoryOrders());
         });
         
+        // Admin panel - kategoriya tartibini belgilash
+        app.post('/api/catorder', async (req, res) => {
+            const { category, order } = req.body;
+            if (!category || order === undefined) {
+                return res.status(400).json({ error: 'category va order kerak' });
+            }
+            try {
+                const result = await setCategoryOrder(String(category), Number(order));
+                sendSseEvent('menu_updated');
+                return res.json(result);
+            } catch (error) {
+                return res.status(500).json({ error: error.message });
+            }
+        });
+        
         app.post('/api/menu', async (req, res) => {
             const { key, name, price, category, image } = req.body;
             

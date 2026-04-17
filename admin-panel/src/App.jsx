@@ -1155,6 +1155,7 @@ export default function App() {
   const [page, setPage] = useState('dashboard');
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
+  const [categoryOrders, setCategoryOrders] = useState([]);
   const [statsData, setStatsData] = useState({
     totalOrders: 0,
     newOrders: 0,
@@ -1210,11 +1211,12 @@ export default function App() {
   
   async function loadData({ playSoundForNew = false } = {}) {
     try {
-      const [menuRes, ordersRes, statsRes, allStatsRes] = await Promise.all([
+      const [menuRes, ordersRes, statsRes, allStatsRes, catRes] = await Promise.all([
         fetch(`${API}/menu`),
         fetch(`${API}/orders`),
         fetch(`${API}/stats`),
         fetch(`${API}/stats?all=true`),
+        fetch(`${API}/categories`),
       ]);
       const menuData = await menuRes.json();
       const ordersData = await ordersRes.json();
@@ -1242,6 +1244,7 @@ export default function App() {
       }
       
       setProducts(Object.values(menuData || {}));
+      try { const catData = await catRes.json(); setCategoryOrders(Array.isArray(catData) ? catData : []); } catch {}
       setOrders(safeOrders);
       
       try {
@@ -1758,6 +1761,46 @@ export default function App() {
     )}
     
     {page === 'products' && (
+      <>
+      {/* Kategoriya tartibi */}
+      <Card>
+      <SectionTitle title="Kategoriya tartibi" subtitle="Menyu va miniappdagi ko'rinish tartibi" isMobile={isMobile} />
+      <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>
+      {[...new Set(products.map(p => p.category).filter(Boolean))].map(cat => {
+        const existing = categoryOrders.find(c => c.category === cat);
+        const currentOrder = existing?.order ?? '';
+        return (
+          <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 14, background: '#f8fafc', border: '1px solid #e5e7eb' }}>
+          <span style={{ flex: 1, fontWeight: 700, fontSize: 15 }}>{cat}</span>
+          <input
+          type="number"
+          defaultValue={currentOrder}
+          placeholder="Tartib"
+          min={1}
+          id={`catorder_${cat}`}
+          style={{ width: 80, padding: '7px 10px', borderRadius: 10, border: '1px solid #e5e7eb', fontSize: 14, fontWeight: 600, outline: 'none' }}
+          />
+          <Button
+          onClick={async () => {
+            const val = document.getElementById(`catorder_${cat}`)?.value;
+            if (!val) return;
+            await fetch(`${API}/catorder`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ category: cat, order: Number(val) })
+            });
+            await loadData();
+          }}
+          style={{ padding: '7px 14px', fontSize: 13 }}
+          >
+          Saqlash
+          </Button>
+          </div>
+        );
+      })}
+      </div>
+      </Card>
+      
       <Card>
       <SectionTitle
       title="Mahsulotlar"
@@ -1823,6 +1866,7 @@ export default function App() {
       ))}
       </div>
       </Card>
+      </>
     )}
     
     {page === 'stats' && (
