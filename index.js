@@ -1220,7 +1220,7 @@ function buildAdminText(order) {
                 [
                     'Ajabo Burger',
                     '',
-                    `📞 Telefon: +998 90 123 45 67`,
+                    `📞 Telefon: +998 97 510 51 08`,
                     `🕒 Ish vaqti: ${getWorkHoursText()}`,
                     `⏰ Hozirgi vaqt: ${getCurrentTimeText()}`,
                     '',
@@ -1736,7 +1736,7 @@ function buildAdminText(order) {
                 [
                     '☎️ *Biz bilan bog\'laning*',
                     '',
-                    '📞 Telefon: +998 90 123 45 67',
+                    '📞 Telefon: +998 97 510 51 08',
                     '',
                     `🕒 Ish vaqti: ${getWorkHoursText()}`,
                     `⏰ Hozirgi vaqt: ${getCurrentTimeText()}`,
