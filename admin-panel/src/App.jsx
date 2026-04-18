@@ -511,7 +511,7 @@ function InfoLine({ icon: Icon, text, link }) {
 function DeliveryFeeBox({ order, onDeliveryFeeUpdate }) {
   const [fee, setFee] = React.useState(order.deliveryFee ? String(order.deliveryFee) : '');
   const [saving, setSaving] = React.useState(false);
-  const [saved, setSaved] = React.useState(false);
+  const [saved, setSaved] = React.useState(order.deliveryFee > 0); // refresh da ham to'g'ri ko'rinadi
   
   if (order.deliveryType === 'pickup') return null;
   
