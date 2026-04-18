@@ -1123,17 +1123,16 @@ function buildAdminText(order) {
                 return ctx.reply(getClosedText());
             }
             
-            // To'g'ridan geo-joylashuv so'rash
-            ctx.session.step = 'location_check';
+            // Avval telefon raqam so'rash
+            ctx.session.step = 'phone_before_location';
             return ctx.reply(
                 [
-                    '📍 Joylashuvingizni yuboring',
+                    '📱 Telefon raqamingizni yuboring',
                     '',
-                    'Biz faqat Shovot tumani (Xorazm viloyati) bo\'ylab yetkazib beramiz.',
-                    'Joylashuvingiz tekshiriladi va buyurtma sahifasi ochiladi.'
+                    "Quyidagi tugmani bosing yoki raqamni qo'lda kiriting:"
                 ].join('\n'),
                 Markup.keyboard([
-                    [Markup.button.locationRequest('📍 Geo-joylashuvni yuborish')],
+                    [Markup.button.contactRequest('📱 Telefon raqamni yuborish')],
                     ['⬅️ Ortga']
                 ]).resize()
             );
@@ -1220,7 +1219,7 @@ function buildAdminText(order) {
                 [
                     'Ajabo Burger',
                     '',
-                    `📞 Telefon: +998 97 510 51 08`,
+                    `📞 Telefon: +998 90 123 45 67`,
                     `🕒 Ish vaqti: ${getWorkHoursText()}`,
                     `⏰ Hozirgi vaqt: ${getCurrentTimeText()}`,
                     '',
@@ -1494,6 +1493,25 @@ function buildAdminText(order) {
         });
         
         bot.on('contact', (ctx) => {
+            // Buyurtma berish oqimida telefon
+            if (ctx.session.step === 'phone_before_location') {
+                ctx.session.orderData.phone = ctx.message.contact.phone_number;
+                ctx.session.step = 'location_check';
+                return ctx.reply(
+                    [
+                        '✅ Telefon saqlandi!',
+                        '',
+                        '📍 Endi joylashuvingizni yuboring',
+                        '',
+                        'Biz faqat Shovot tumani (Xorazm viloyati) bo\'ylab yetkazib beramiz.'
+                    ].join('\n'),
+                    Markup.keyboard([
+                        [Markup.button.locationRequest('📍 Geo-joylashuvni yuborish')],
+                        ['⬅️ Ortga']
+                    ]).resize()
+                );
+            }
+            
             if (ctx.session.step !== 'phone') return;
             
             ctx.session.orderData.phone = ctx.message.contact.phone_number;
@@ -1598,6 +1616,35 @@ function buildAdminText(order) {
             const text = (ctx.message.text || '').trim();
             
             // Feedback
+            // Qo'lda telefon kiritish (phone_before_location)
+            if (ctx.session.step === 'phone_before_location') {
+                const phone = text.replace(/\D/g, '');
+                if (phone.length < 9) {
+                    return ctx.reply(
+                        "Telefon raqam noto'g'ri. Iltimos qaytadan kiriting yoki tugmani bosing.",
+                        Markup.keyboard([
+                            [Markup.button.contactRequest('📱 Telefon raqamni yuborish')],
+                            ['⬅️ Ortga']
+                        ]).resize()
+                    );
+                }
+                ctx.session.orderData.phone = '+' + phone;
+                ctx.session.step = 'location_check';
+                return ctx.reply(
+                    [
+                        '✅ Telefon saqlandi!',
+                        '',
+                        '📍 Endi joylashuvingizni yuboring',
+                        '',
+                        'Biz faqat Shovot tumani (Xorazm viloyati) bo\'ylab yetkazib beramiz.'
+                    ].join('\n'),
+                    Markup.keyboard([
+                        [Markup.button.locationRequest('📍 Geo-joylashuvni yuborish')],
+                        ['⬅️ Ortga']
+                    ]).resize()
+                );
+            }
+            
             if (ctx.session.step === 'feedback') {
                 if (!text || text === '❌ Bekor qilish') {
                     ctx.session.step = null;
