@@ -345,7 +345,7 @@ function buildAdminText(order) {
                 ? `Yo'l haqi: ${formatPrice(order.deliveryFee)}`
                 : "Yo'l haqi: Belgilanmagan"
             ] : []),
-            `Jami: ${formatPrice(Number(order.total || 0) + Number(order.deliveryFee || 0))}`,
+            `Jami: ${formatPrice(Number(order.total || 0))}`,
             ...(order.clickTransactionId ? [`Click transaction: ${order.clickTransactionId}`] : []),
             ...(order.paidAt ? [`To'langan vaqt: ${new Date(order.paidAt).toLocaleString('uz-UZ', { timeZone: TIME_ZONE })}`] : []),
             '',
