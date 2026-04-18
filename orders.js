@@ -29,6 +29,8 @@ export async function initOrders() {
         location: item.location || null,
         cart: item.cart || {},
         cartText: item.cartText || '',
+        subtotal: Number(item.subtotal || item.total || 0),
+        deliveryFee: Number(item.deliveryFee || 0),
         total: Number(item.total || 0),
         status: item.status || 'Yangi buyurtma',
         paymentMethod: normalizePaymentMethod(item.paymentMethod),
@@ -56,6 +58,8 @@ export async function addOrder(order) {
     const newOrder = {
         ...order,
         deliveryType: order.deliveryType || 'delivery',
+        subtotal: Number(order.subtotal || order.total || 0),
+        deliveryFee: Number(order.deliveryFee || 0),
         total: Number(order.total || 0),
         paymentMethod: normalizePaymentMethod(order.paymentMethod),
         paymentStatus: normalizePaymentStatus(order.paymentStatus),
@@ -121,6 +125,15 @@ export async function updateOrderPayment(id, data = {}) {
         order.clickTransactionId = data.clickTransactionId || null;
     }
     
+    // Yo'l haqi va jami summani yangilash
+    if (data.deliveryFee !== undefined) {
+        order.deliveryFee = Number(data.deliveryFee);
+    }
+    
+    if (data.total !== undefined) {
+        order.total = Number(data.total);
+    }
+    
     order.updatedAt = new Date().toISOString();
     
     const collection = await getOrdersCollection();
@@ -132,6 +145,8 @@ export async function updateOrderPayment(id, data = {}) {
                 paymentStatus: order.paymentStatus,
                 paidAt: order.paidAt,
                 clickTransactionId: order.clickTransactionId,
+                deliveryFee: order.deliveryFee,
+                total: order.total,
                 updatedAt: order.updatedAt,
             }
         }
@@ -211,34 +226,37 @@ export function getTodayStats(timeZone = 'Asia/Tashkent') {
     const readyOrders = todayOrders.filter((o) => o.status === 'Tayyor').length;
     const deliveredOrders = todayOrders.filter((o) => o.status === 'Yetkazildi').length;
     
-    const totalRevenue = todayOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
-    const deliveredRevenue = todayOrders
-    .filter((o) => o.status === 'Yetkazildi')
+    const activeOrders = todayOrders.filter((o) => o.status !== 'Bekor qilindi');
+    const totalRevenue = activeOrders
+    .filter((o) => o.paymentStatus === 'paid' || (o.paymentMethod || 'cash') === 'cash')
     .reduce((sum, o) => sum + Number(o.total || 0), 0);
     
-    const cashRevenue = todayOrders
-    .filter((o) => o.paymentMethod === 'cash')
+    const cashRevenue = activeOrders
+    .filter((o) => (o.paymentMethod || 'cash') === 'cash')
     .reduce((sum, o) => sum + Number(o.total || 0), 0);
     
-    const clickRevenue = todayOrders
-    .filter((o) => o.paymentMethod === 'click')
+    const clickRevenue = activeOrders
+    .filter((o) => o.paymentMethod === 'click' && o.paymentStatus === 'paid')
     .reduce((sum, o) => sum + Number(o.total || 0), 0);
     
-    const paidOrders = todayOrders.filter((o) => o.paymentStatus === 'paid').length;
-    const pendingPaymentOrders = todayOrders.filter((o) => o.paymentStatus === 'pending').length;
-    
-    return {
-        date: today,
-        totalOrders,
-        newOrders,
-        acceptedOrders,
-        readyOrders,
-        deliveredOrders,
-        totalRevenue,
-        deliveredRevenue,
-        cashRevenue,
-        clickRevenue,
-        paidOrders,
-        pendingPaymentOrders,
-    };
+    const paidOrders = activeOrders.filter((o) =>
+        o.paymentStatus === 'paid' || (o.paymentMethod || 'cash') === 'cash'
+).length;
+const pendingPaymentOrders = todayOrders.filter((o) =>
+    o.paymentMethod === 'click' && (o.paymentStatus || 'pending') === 'pending'
+).length;
+
+return {
+    date: today,
+    totalOrders,
+    newOrders,
+    acceptedOrders,
+    readyOrders,
+    deliveredOrders,
+    totalRevenue,
+    cashRevenue,
+    clickRevenue,
+    paidOrders,
+    pendingPaymentOrders,
+};
 }

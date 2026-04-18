@@ -566,8 +566,7 @@ function DeliveryFeeBox({ order, onDeliveryFeeUpdate }) {
         setSaving(true);
         await onDeliveryFeeUpdate(order.id, Number(fee));
         setSaving(false);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
+        setSaved(true); // Faqat O'zgartirish bosilganda yashiriladi
       }}
       style={{
         padding: '9px 14px', borderRadius: 12, border: 'none',
