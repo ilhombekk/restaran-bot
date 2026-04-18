@@ -79,6 +79,7 @@ if (miniAppPath) {
 
 const sseClients = new Set();
 const paymentTimers = new Map();
+const userPhones = new Map(); // userId -> phone
 
 function sendSseEvent(type, payload = {}) {
     const data = `data: ${JSON.stringify({
@@ -1496,6 +1497,8 @@ function buildAdminText(order) {
             // Buyurtma berish oqimida telefon
             if (ctx.session.step === 'phone_before_location') {
                 ctx.session.orderData.phone = ctx.message.contact.phone_number;
+                // userId ga phone ni saqlash (Mini App uchun)
+                userPhones.set(String(ctx.from.id), ctx.message.contact.phone_number);
                 ctx.session.step = 'location_check';
                 return ctx.reply(
                     [
@@ -1754,6 +1757,12 @@ function buildAdminText(order) {
             res.send('Bot + API ishlayapti');
         });
         
+        // Mini App uchun saqlangan telefon raqamni olish
+        app.get('/api/user-phone/:userId', (req, res) => {
+            const phone = userPhones.get(String(req.params.userId));
+            return res.json({ phone: phone || null });
+        });
+        
         app.get('/health', (req, res) => {
             res.status(200).json({
                 ok: true,
@@ -1887,6 +1896,12 @@ function buildAdminText(order) {
                 
                 if (!order.id || !order.total) {
                     return res.status(400).json({ error: 'id va total kerak' });
+                }
+                
+                // Phone raqamini userPhones dan olish (agar bo'sh bo'lsa)
+                if (!order.phone && order.userId) {
+                    const savedPhone = userPhones.get(String(order.userId));
+                    if (savedPhone) order.phone = savedPhone;
                 }
                 
                 await addOrder(order);
