@@ -1938,6 +1938,7 @@ export default function App() {
       {dailyStats.length === 0 ? (
         <div style={{ marginTop: 18, color: '#64748b' }}>Hozircha kunlik statistika yo'q</div>
       ) : (
+        <>
         {/* Pagination tugmalari */}
         {dailyStats.length > STATS_PER_PAGE && (
           <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
@@ -2001,6 +2002,7 @@ export default function App() {
           </div>
         ))}
         </div>
+        </>
       )}
       </Card>
       </div>
