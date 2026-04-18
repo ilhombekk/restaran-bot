@@ -2120,6 +2120,23 @@ function buildAdminText(order) {
             }
         });
         
+        // Barcha tarix buyurtmalarni o'chirish
+        app.delete('/api/orders/history/all', async (req, res) => {
+            try {
+                const allOrders = getAllOrders();
+                const historyOrders = allOrders.filter(o =>
+                    o.status === 'Yetkazildi' || o.status === 'Bekor qilindi'
+                );
+                for (const order of historyOrders) {
+                    await deleteOrder(order.id);
+                }
+                sendSseEvent('orders_cleared');
+                return res.json({ deleted: historyOrders.length });
+            } catch (error) {
+                return res.status(500).json({ error: error.message });
+            }
+        });
+        
         app.delete('/api/orders/:id', async (req, res) => {
             const id = req.params.id;
             

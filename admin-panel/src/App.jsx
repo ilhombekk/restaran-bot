@@ -1169,6 +1169,8 @@ export default function App() {
   });
   
   
+  const [statsPage, setStatsPage] = useState(1);
+  const STATS_PER_PAGE = 7;
   const [allStatsData, setAllStatsData] = useState({
     totalOrders: 0,
     newOrders: 0,
@@ -1713,7 +1715,30 @@ export default function App() {
     
     {page === 'orders' && (
       <Card>
-      <SectionTitle title="Buyurtmalar" subtitle={`Har sahifada ${ORDERS_PER_PAGE} ta buyurtma`} isMobile={isMobile} />
+      <SectionTitle
+      title="Buyurtmalar"
+      subtitle={`Har sahifada ${ORDERS_PER_PAGE} ta buyurtma`}
+      isMobile={isMobile}
+      right={
+        orderTab === 'history' && historyOrders.length > 0 ? (
+          <button
+          onClick={async () => {
+            if (!window.confirm(`Barcha ${historyOrders.length} ta tarix buyurtmasini o'chirasizmi?`)) return;
+            await fetch(`${API}/orders/history/all`, { method: 'DELETE' });
+            await loadData();
+          }}
+          style={{
+            padding: '9px 16px', borderRadius: 12, border: 'none',
+            background: '#fee2e2', color: '#991b1b',
+            fontWeight: 700, fontSize: 13, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 6
+          }}
+          >
+          <span>🗑</span> Tarixni tozalash
+          </button>
+        ) : null
+      }
+      />
       <div style={{ marginTop: 18, display: 'grid', gap: 14 }}>
       <div style={{ display: 'grid', gap: 10, padding: 12, borderRadius: 18, background: '#f8fafc', border: '1px solid #eef2f7' }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', overflowX: 'auto', paddingBottom: 2 }}>
@@ -1913,8 +1938,30 @@ export default function App() {
       {dailyStats.length === 0 ? (
         <div style={{ marginTop: 18, color: '#64748b' }}>Hozircha kunlik statistika yo'q</div>
       ) : (
+        {/* Pagination tugmalari */}
+        {dailyStats.length > STATS_PER_PAGE && (
+          <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
+          {Array.from({ length: Math.ceil(dailyStats.length / STATS_PER_PAGE) }, (_, i) => i + 1).map(p => (
+            <button
+            key={p}
+            onClick={() => setStatsPage(p)}
+            style={{
+              padding: '8px 16px', borderRadius: 12, border: 'none',
+              background: statsPage === p ? '#0f172a' : '#f1f5f9',
+              color: statsPage === p ? '#fff' : '#0f172a',
+              fontWeight: 700, fontSize: 14, cursor: 'pointer'
+            }}
+            >
+            {p}
+            </button>
+          ))}
+          <span style={{ padding: '8px 12px', fontSize: 13, color: '#64748b', alignSelf: 'center' }}>
+          {((statsPage-1)*STATS_PER_PAGE)+1}–{Math.min(statsPage*STATS_PER_PAGE, dailyStats.length)} / {dailyStats.length} kun
+          </span>
+          </div>
+        )}
         <div style={{ display: 'grid', gap: 16, marginTop: 18 }}>
-        {dailyStats.map((day) => (
+        {dailyStats.slice((statsPage-1)*STATS_PER_PAGE, statsPage*STATS_PER_PAGE).map((day) => (
           <div key={day.dateKey} style={{ border: '1px solid #e5e7eb', borderRadius: 22, padding: isMobile ? 14 : 18, background: '#ffffff' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 16, flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row' }}>
           <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: '#0f172a' }}>{day.dateLabel}</div>
