@@ -766,8 +766,16 @@
                 groups[p.category].push(p);
             });
             
+            // Kategoriyalarni categoryOrder bo'yicha tartiblash
+            const sortedCats = Object.keys(groups).sort((a, b) => {
+                const oa = categoryOrder.find(c => c.category === a)?.order ?? 9999;
+                const ob = categoryOrder.find(c => c.category === b)?.order ?? 9999;
+                return oa - ob;
+            });
+            
             let html = '';
-            Object.entries(groups).forEach(([cat, items]) => {
+            sortedCats.forEach(cat => {
+                const items = groups[cat];
                 html += `<div class="section-title">${cat}</div><div class="products-grid">`;
                     items.forEach(p => { html += productCard(p); });
                     html += `</div>`;
