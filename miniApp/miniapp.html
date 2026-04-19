@@ -942,7 +942,7 @@
       ${deliveryType === 'delivery' ? `
       <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
         <span style="font-size:14px;color:var(--text2)">Yetkazib berish:</span>
-        <span style="font-size:11px;font-weight:700;color:var(--primary-light);font-style:italic;white-space:nowrap">Masofaga qarab belgilanadi</span>
+        <span style="font-size:14px;font-weight:800;color:var(--primary);white-space:nowrap">Yo'l haqi masofaga qarab belgilanadi</span>
       </div>` : ''}
       <div style="display:flex;justify-content:space-between;width:100%;margin-top:4px;padding-top:8px;border-top:1px solid var(--border)">
         <span class="cart-total-label">Jami:</span>
@@ -972,6 +972,10 @@
         <span class="form-label">Manzil</span>
         <textarea class="address-input" id="addressInput" rows="2" placeholder="Masalan: Stansa paxta zavod ko'chasi, Moskva Lenin maktab..."></textarea>
       </div>
+
+      <span class="form-label">Izoh <span style="font-size:13px;font-weight:600;color:var(--text3)">(ixtiyoriy)</span></span>
+      <textarea class="address-input" id="commentInput" rows="2" placeholder="Masalan: Kesib qo'ying, qo'shimcha sous bering..."></textarea>
+
 
       <div style="background:#f8f4ef;border-radius:14px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
         <span style="font-size:18px">💳</span>
@@ -1013,7 +1017,9 @@
                 btn.textContent = 'Yuklanmoqda...';
                 
                 // Cart text yasash
-                const cartText = '🛒 Savat:\n\n' + items.map(i => `${i.name} x ${i.qty} = ${formatPrice(i.total)}`).join('\n');
+                const comment = document.getElementById('commentInput')?.value?.trim() || '';
+                const cartText = '🛒 Savat:\n\n' + items.map(i => `${i.name} x ${i.qty} = ${formatPrice(i.total)}`).join('\n')
+                + (comment ? `\n\n💬 Izoh: ${comment}` : '');
                 
                 const user = tg?.initDataUnsafe?.user;
                 const orderId = Date.now().toString().slice(-6);
@@ -1043,6 +1049,7 @@
                     adminMessageId: null,
                     adminLocationMessageId: null,
                     source: 'miniapp',
+                    comment,
                 };
                 
                 try {
