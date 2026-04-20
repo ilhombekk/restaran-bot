@@ -892,6 +892,9 @@ function buildAdminText(order) {
         // =============================================
         
         bot.start((ctx) => {
+            // Admin guruhda /start bosilsa hech narsa qilma
+            if (isAdminChat(ctx)) return;
+            
             clearUnavailableCartItems(ctx.session.cart);
             ctx.session.step = null;
             ctx.session.orderData = {};
