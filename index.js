@@ -1802,6 +1802,15 @@ function buildAdminText(order) {
             });
         });
         
+        app.get('/api/menu-tv', async (req, res) => {
+            const items = Object.values(getMenu()).filter(item => item.active !== false);
+            
+            return res.json({
+                success: true,
+                items
+            });
+        });
+        
         app.get('/api/menu', async (req, res) => {
             return res.json(getMenu());
         });
