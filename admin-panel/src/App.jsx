@@ -365,7 +365,7 @@ function setFaviconBadge(count) {
   } catch {}
 }
 
-function startTabBlink(count) {
+function startTabBlink(count, t = TRANSLATIONS.cy) {
   newOrderCount = count;
   setFaviconBadge(count);
   
@@ -398,7 +398,7 @@ function requestNotificationPermission() {
   }
 }
 
-function showBrowserNotification(order) {
+function showBrowserNotification(order, t = TRANSLATIONS.cy) {
   if (!('Notification' in window)) return;
   if (Notification.permission !== 'granted') return;
   
@@ -630,7 +630,7 @@ function Badge({ status, statusMap: sm }) {
   );
 }
 
-function PaymentBadge({ paymentStatus, paymentMethod }) {
+function PaymentBadge({ paymentStatus, paymentMethod, t = TRANSLATIONS.cy }) {
   // Наличные + pending bo'lsa badge ko'rsatilmaydi
   const isCash = !paymentMethod || paymentMethod === 'cash';
   const isPending = !paymentStatus || paymentStatus === 'pending';
@@ -660,7 +660,7 @@ function PaymentBadge({ paymentStatus, paymentMethod }) {
   );
 }
 
-function MethodBadge({ paymentMethod }) {
+function MethodBadge({ paymentMethod, t = TRANSLATIONS.cy }) {
   const isClick = paymentMethod === 'click';
   return (
     <span
@@ -922,7 +922,7 @@ function PaymentInfoBox({ order, t = TRANSLATIONS.cy }) {
         <div>
         <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>{t?.pay_time || 'Тўланган вақт'}</div>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>
-        {formatDateTime(order.paidAt)}
+        {formatDateTime(order.paidAt, t)}
         </div>
         </div>
         </div>
@@ -1019,8 +1019,8 @@ function PaymentInfoBox({ order, t = TRANSLATIONS.cy }) {
         <InfoLine icon={Eye} text={order.name || (t?.unknown || "Номаълум")} />
         <InfoLine icon={Phone} text={order.phone || (t?.no_phone || "Телефон йўқ")} />
         <InfoLine icon={AtSign} text={username} />
-        <InfoLine icon={Clock3} text={formatDateTime(order.createdAt)} />
-        <InfoLine icon={Truck} text={getDeliveryTypeText(order)} />
+        <InfoLine icon={Clock3} text={formatDateTime(order.createdAt, t)} />
+        <InfoLine icon={Truck} text={getDeliveryTypeText(order, t)} />
         </div>
         </div>
         
@@ -1137,8 +1137,8 @@ function PaymentInfoBox({ order, t = TRANSLATIONS.cy }) {
         <InfoLine icon={Eye} text={order.name || (t?.unknown || "Номаълум")} />
         <InfoLine icon={Phone} text={order.phone || (t?.no_phone || "Телефон йўқ")} />
         <InfoLine icon={AtSign} text={username} />
-        <InfoLine icon={Clock3} text={formatDateTime(order.createdAt)} />
-        <InfoLine icon={Truck} text={getDeliveryTypeText(order)} />
+        <InfoLine icon={Clock3} text={formatDateTime(order.createdAt, t)} />
+        <InfoLine icon={Truck} text={getDeliveryTypeText(order, t)} />
         </div>
         
         {/* 2-ustun: Маҳсулотлар + Манзил */}
@@ -1275,7 +1275,7 @@ function PaymentInfoBox({ order, t = TRANSLATIONS.cy }) {
   };
 }
 
-function buildDailyStats(orders) {
+function buildDailyStats(orders, t = TRANSLATIONS.cy) {
   const map = new Map();
   for (const order of orders) {
     const key = getDateKey(order.createdAt);
@@ -1283,7 +1283,7 @@ function buildDailyStats(orders) {
     if (!map.has(key)) {
       map.set(key, {
         dateKey: key,
-        dateLabel: formatDateOnly(order.createdAt),
+        dateLabel: formatDateOnly(order.createdAt, t),
         totalOrders: 0,
         revenue: 0,
         deliveredRevenue: 0,
@@ -1587,7 +1587,7 @@ export default function App() {
     return currentOrders.slice(startIndex, startIndex + ORDERS_PER_PAGE);
   }, [currentOrders, orderPage]);
   
-  const dailyStats = useMemo(() => buildDailyStats(orders), [orders]);
+  const dailyStats = useMemo(() => buildDailyStats(orders, t), [orders, t]);
   
   const topStatsGrid = isMobile ? 'repeat(2, 1fr)' : isTablet ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)';
   const dashboardQuickGrid = isMobile ? 'repeat(2, 1fr)' : isTablet ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)';
