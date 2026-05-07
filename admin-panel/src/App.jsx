@@ -282,7 +282,7 @@ function formatPrice(value) {
   return new Intl.NumberFormat('uz-UZ').format(Number(value || 0)) + " сўм";
 }
 
-function formatDateTime(value) {
+function formatDateTime(value, t = TRANSLATIONS.cy) {
   if (!value) return t.no_time;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return t.no_time;
@@ -295,7 +295,7 @@ function formatDateTime(value) {
   }).format(date);
 }
 
-function formatDateOnly(value) {
+function formatDateOnly(value, t = TRANSLATIONS.cy) {
   if (!value) return t.no_date;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return t.no_date;
@@ -426,17 +426,17 @@ function showBrowserNotification(order) {
   } catch {}
 }
 
-function getPaymentMethodText(paymentMethod) {
+function getPaymentMethodText(paymentMethod, t = TRANSLATIONS.cy) {
   return paymentMethod === 'click' ? 'Click' : t.cash;
 }
 
-function getPaymentStatusText(paymentStatus) {
+function getPaymentStatusText(paymentStatus, t = TRANSLATIONS.cy) {
   if (paymentStatus === 'paid') return t.paid;
   if (paymentStatus === 'failed') return t.failed;
   return t.pending;
 }
 
-function getDeliveryTypeText(order) {
+function getDeliveryTypeText(order, t = TRANSLATIONS.cy) {
   if (order?.deliveryType === 'pickup') return t.pickup;
   return t.delivery;
 }
@@ -979,8 +979,8 @@ function PaymentInfoBox({ order, t = TRANSLATIONS.cy }) {
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
       <Badge status={order.status} statusMap={getStatusMap(t)} />
-      <MethodBadge paymentMethod={order.paymentMethod} />
-      <PaymentBadge paymentStatus={order.paymentStatus} paymentMethod={order.paymentMethod} />
+      <MethodBadge paymentMethod={order.paymentMethod} t={t} />
+      <PaymentBadge paymentStatus={order.paymentStatus} paymentMethod={order.paymentMethod} t={t} />
       </div>
       </div>
       
@@ -1324,7 +1324,7 @@ function buildDailyStats(orders) {
   return Array.from(map.values()).sort((a, b) => b.dateKey.localeCompare(a.dateKey));
 }
 
-function Pagination({ currentPage, totalPages, onPageChange, isMobile = false }) {
+function Pagination({ currentPage, totalPages, onPageChange, isMobile = false, t = TRANSLATIONS.cy }) {
   if (totalPages <= 1) return null;
   const pages = [];
   const start = Math.max(1, currentPage - (isMobile ? 1 : 2));
@@ -1471,12 +1471,12 @@ export default function App() {
           // Yangi buyurtmalarni topish
           const newOrders = safeOrders.filter(o => !knownIds.has(String(o.id)));
           // Brauzer notification
-          newOrders.forEach(order => showBrowserNotification(order));
+          newOrders.forEach(order => showBrowserNotification(order, t));
           // Tab notification - yangi buyurtmalar soni
           const activeNewCount = safeOrders.filter(o =>
             o.status !== 'Yetkazildi' && o.status !== 'Bekor qilindi'
           ).length;
-          startTabBlink(newOrders.length);
+          startTabBlink(newOrders.length, t);
         }
         notifiedOrderIdsRef.current = new Set(incomingIds);
       } else if (notifiedOrderIdsRef.current.size === 0) {
@@ -1945,7 +1945,7 @@ export default function App() {
     {page === 'dashboard' && (
       <>
       <Card>
-      <SectionTitle title={t.last_orders} subtitle={t.last_orders}_sub isMobile={isMobile} />
+      <SectionTitle title={t.last_orders} subtitle={t.last_orders_sub} isMobile={isMobile} />
       <div style={{ display: 'grid', gap: 16, marginTop: 18 }}>
       {filteredOrders.slice(0, 3).map((order) => (
         <OrderCard
@@ -2029,7 +2029,7 @@ export default function App() {
         </div>
       )}
       
-      <Pagination currentPage={orderPage} totalPages={totalOrderPages} onPageChange={setOrderPage} isMobile={isMobile} />
+      <Pagination currentPage={orderPage} totalPages={totalOrderPages} onPageChange={setOrderPage} isMobile={isMobile} t={t} />
       </div>
       </Card>
     )}
