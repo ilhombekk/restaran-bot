@@ -1427,7 +1427,7 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [streamStatus, setStreamStatus] = useState(t.connecting);
+  const [streamStatus, setStreamStatus] = useState(() => (TRANSLATIONS[localStorage.getItem('admin_lang') || 'cy'] || TRANSLATIONS.cy).connecting);
   const [orderPage, setOrderPage] = useState(1);
   const [imageMode, setImageMode] = useState('url');
   const [orderTab, setOrderTab] = useState('active');
@@ -1496,9 +1496,9 @@ export default function App() {
       
       try {
         const allStats = await allStatsRes.json();
-        setAllStatsData(allStats || buildAllStatsFromOrders(safeOrders));
+        setAllStatsData(allStats || buildStatsFromOrders(safeOrders));
       } catch {
-        setAllStatsData(buildAllStatsFromOrders(safeOrders));
+        setAllStatsData(buildStatsFromOrders(safeOrders));
       }
     } catch (error) {
       console.error("Маълумотларни юклашда хато:", error);
@@ -2038,7 +2038,7 @@ export default function App() {
       <>
       {/* Порядок категорий */}
       <Card>
-      <SectionTitle title={t.cat_order} subtitle={t.cat_order}_sub isMobile={isMobile} />
+      <SectionTitle title={t.cat_order} subtitle={t.cat_order_sub} isMobile={isMobile} />
       <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>
       {[...new Set(products.map(p => p.category).filter(Boolean))].map(cat => {
         const existing = categoryOrders.find(c => c.category === cat);
@@ -2146,7 +2146,7 @@ export default function App() {
     {page === 'stats' && (
       <div style={{ display: 'grid', gap: 22 }}>
       <Card>
-      <SectionTitle title={t.all_stats} subtitle={t.all_stats}_sub isMobile={isMobile} />
+      <SectionTitle title={t.all_stats} subtitle={t.all_stats_sub} isMobile={isMobile} />
       <div style={{ marginTop: 18, display: 'grid', gridTemplateColumns: statsGrid4, gap: 16 }}>
       <div style={{ padding: 18, borderRadius: 20, background: '#f8fafc' }}>
       <div style={{ fontSize: 14, color: '#64748b' }}>{t.total_orders}</div>
@@ -2184,7 +2184,7 @@ export default function App() {
       </Card>
       
       <Card>
-      <SectionTitle title={t.daily_stats} subtitle={t.daily_stats}_sub isMobile={isMobile} />
+      <SectionTitle title={t.daily_stats} subtitle={t.daily_stats_sub} isMobile={isMobile} />
       {dailyStats.length === 0 ? (
         <div style={{ marginTop: 18, color: '#64748b' }}>{t.no_daily}</div>
       ) : (
