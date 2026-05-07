@@ -128,8 +128,8 @@ const TRANSLATIONS = {
     status_new: "Янги", status_accepted: "Қабул қилинди", status_ready: "Тайёр",
     status_delivered: "Етказилди", status_cancelled: "Бекор қилинди",
     cash: "Нақд", payment_method: "Тўлов усули", payment_status: "Тўлов ҳолати",
-    click_paid: t?.click_paid || "Click орқали тўланди ✓", order_cancelled_pay: t?.order_cancelled_pay || "Буюртма бекор — тўлов амалга ошмади ✗",
-    pay_failed: t?.pay_failed || "Тўлов амалга ошмади ✗", pay_pending: t?.pay_pending || "Тўлов кутилмоқда...",
+    click_paid: "Click орқали тўланди ✓", order_cancelled_pay: "Буюртма бекор — тўлов амалга ошмади ✗",
+    pay_failed: "Тўлов амалга ошмади ✗", pay_pending: "Тўлов кутилмоқда...",
     pay_time: "Тўланган вақт", pay_info: "Тўлов маълумотлари",
     click_payment: "Click орқали тўлов", cash_payment: "Нақд пул тўлов",
     paid: "Тўланди", pending: "Кутилмоқда", failed: "Муваффақиятсиз",
@@ -139,7 +139,7 @@ const TRANSLATIONS = {
     order: "Буюртма #", total: "Жами сумма", client: "Мижоз маълумотлари",
     unknown: "Номаълум", no_phone: "Телефон йўқ", products: "Маҳсулотлар",
     no_product: "Маҳсулот топилмади", address: "Манзил", no_address: "Манзил йўқ",
-    open_map: (t?.open_map || "Харитада очиш"), manage: "Буюртмани бошқариш",
+    open_map: "Харитада очиш", manage: "Буюртмани бошқариш",
     accept: "Қабул", ready: "Тайёр", delivered: "Етказилди", delete: "Ўчириш",
     history_manage: "Тарихни бошқариш",
     orders: "Буюртмалар", products_menu: "Маҳсулотлар", stats: "Статистика",
@@ -747,9 +747,9 @@ function InfoLine({ icon: Icon, text, link }) {
 
 // Yo'l haqi belgilash komponenti (faqat delivery)
 function DeliveryFeeBox({ order, onDeliveryFeeUpdate, t = getCurrentT() }) {
-  const [fee, setFee] = React.useState(order.deliveryFee ? String(order.deliveryFee) : '');
-  const [saving, setSaving] = React.useState(false);
-  const [saved, setSaved] = React.useState(order.deliveryFee > 0); // refresh da ham to'g'ri ko'rinadi
+  const [fee, setFee] = useState(order.deliveryFee ? String(order.deliveryFee) : '');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(order.deliveryFee > 0); // refresh da ham to'g'ri ko'rinadi
   
   if (order.deliveryType === 'pickup') return null;
   
