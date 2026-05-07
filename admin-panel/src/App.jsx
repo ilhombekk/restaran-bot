@@ -40,22 +40,252 @@ import {
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const ORDERS_PER_PAGE = 10;
 
-const statusMap = {
-  'Yangi buyurtma': { label: 'Yangi', bg: '#dbeafe', color: '#1d4ed8' },
-  'Qabul qilindi': { label: 'Qabul qilindi', bg: '#fef3c7', color: '#b45309' },
-  'Tayyor': { label: 'Tayyor', bg: '#ede9fe', color: '#6d28d9' },
-  'Yetkazildi': { label: 'Yetkazildi', bg: '#d1fae5', color: '#047857' },
-  'Bekor qilindi': { label: 'Bekor qilindi', bg: '#fee2e2', color: '#b91c1c' },
+// ===== TIL TIZIMI =====
+const TRANSLATIONS = {
+  uz: {
+    // statusMap
+    status_new: "Yangi", status_accepted: "Qabul qilindi", status_ready: "Tayyor",
+    status_delivered: "Yetkazildi", status_cancelled: "Bekor qilindi",
+    // payment
+    cash: "Naqd", payment_method: "To'lov usuli", payment_status: "To'lov holati",
+    click_paid: "Click orqali to'landi ✓", order_cancelled_pay: "Buyurtma bekor — to'lov amalga oshmadi ✗",
+    pay_failed: "To'lov amalga oshmadi ✗", pay_pending: "To'lov kutilmoqda...",
+    pay_time: "To'langan vaqt", pay_info: "To'lov ma'lumotlari",
+    click_payment: "Click orqali to'lov", cash_payment: "Naqd pul to'lov",
+    paid: "To'langan", pending: "Kutilmoqda", failed: "Muvaffaqiyatsiz",
+    // delivery
+    pickup: "O'zi olib ketadi", delivery: "Yetkazib berish",
+    delivery_fee: "Yo'l haqi", set_fee: "Yo'l haqini belgilang",
+    fee_placeholder: "Yo'l haqini kiriting", saved: "Saqlandi!",
+    // order card
+    order: "Buyurtma #", total: "Jami summa", client: "Mijoz ma'lumotlari",
+    unknown: "Noma'lum", no_phone: "Telefon yo'q", products: "Mahsulotlar",
+    no_product: "Mahsulot topilmadi", address: "Manzil", no_address: "Manzil yo'q",
+    open_map: "Xaritada ochish", manage: "Buyurtmani boshqaruvi",
+    accept: "Qabul", ready: "Tayyor", delivered: "Yetkazildi", delete: "O'chirish",
+    history_manage: "Tarixni boshqarish",
+    // sidebar
+    orders: "Buyurtmalar", products_menu: "Mahsulotlar", stats: "Statistika",
+    // header
+    subtitle: "Buyurtmalar, mahsulotlar va to'lovlar real ma'lumotlar bilan ishlayapti.",
+    enable_notif: "Xabarnomalarni yoqish", notif_enabled: "Xabarnomalar yoqilgan",
+    search: "Qidirish...", change: "O'zgartirish",
+    // dashboard
+    today_orders: "Bugungi buyurtmalar", today_helper: "Bugun tushgan",
+    new_orders: "Yangi", new_helper: "Bugungi yangilar",
+    delivered_orders: "Yetkazilgan", delivered_helper: "Bugun yetkazilgan",
+    paid_orders: "To'langan", paid_helper: "Bugun to'langan",
+    pending_orders: "To'lov kutilmoqda", pending_helper: "Click kutilmoqda",
+    cancelled_orders: "Bekor qilingan", cancelled_helper: "Bugun bekor",
+    revenue_today: "Bugungi umumiy tushum",
+    last_orders: "So'nggi buyurtmalar", last_orders_sub: "Oxirgi 3 ta buyurtma",
+    // orders page
+    orders_title: "Buyurtmalar", clear_history: "Tarixni tozalash",
+    all: "Barchasi", pay_filter_pending: "Kutilmoqda", no_orders: "Buyurtma topilmadi",
+    confirm_delete_order: "Rostdan ham bu buyurtmani o'chirmoqchimisiz?",
+    confirm_clear_history: (n) => `Barcha ${n} ta tarix buyurtmasini o'chirasizmi?`,
+    per_page: (n) => `Har sahifada ${n} ta buyurtma`,
+    // products
+    cat_order: "Kategoriya tartibi", cat_order_sub: "Menyu va miniappdagi ko'rinish tartibi",
+    order_placeholder: "Tartib", save: "Saqlash",
+    products_title: "Mahsulotlar", product_count: (n) => `${n} ta mahsulot`,
+    add_product: "Mahsulot qo'shish", active: "Aktiv", hidden: "Yashirin",
+    edit: "Tahrirlash", hide: "Yashirish", show: "Ochish",
+    // stats
+    all_stats: "Umumiy statistika", all_stats_sub: "Barcha vaqtdagi ma'lumotlar",
+    total_orders: "Jami buyurtmalar", total_delivered: "Yetkazilgan",
+    total_paid: "To'langan", total_cancelled: "Bekor qilingan",
+    cash_revenue: "Naqd tushum (jami)", click_revenue: "Click tushum (jami)",
+    total_revenue: "Umumiy tushum", total_pending: "To'lov kutilmoqda",
+    daily_stats: "Har kunlik statistika", daily_stats_sub: "Kunlar bo'yicha tushum va zakazlar",
+    no_daily: "Hozircha kunlik statistika yo'q",
+    daily_orders: "Kunlik jami zakaz", daily_revenue: "Kunlik daromad",
+    daily_cash: "Naqd tushum", daily_click: "Click tushum",
+    stat_new: (n) => `Yangi: ${n}`, stat_accepted: (n) => `Qabul qilindi: ${n}`,
+    stat_ready: (n) => `Tayyor: ${n}`, stat_delivered: (n) => `Yetkazildi: ${n}`,
+    stat_paid: (n) => `To'landi: ${n}`, stat_pending: (n) => `Kutilmoqda: ${n}`,
+    stat_del_rev: (v) => `Yetkazilgan daromad: ${v}`,
+    orders_count: (n) => `${n} ta zakazlar`,
+    days_count: (s, e, t) => `${s}–${e} / ${t} kun`,
+    // form
+    form_add: "Yangi mahsulot qo'shish", form_edit: "Mahsulotni tahrirlash",
+    id_placeholder: "ID / key", name_placeholder: "Mahsulot nomi",
+    price_placeholder: "Narxi", category_placeholder: "Kategoriya",
+    url_btn: "URL bilan", upload_btn: "Upload",
+    img_url_placeholder: "Rasm URL", img_preview: "Rasm preview",
+    cancel: "Bekor qilish",
+    // stream
+    connecting: "Ulanmoqda...", connected: "Real-time ulandi",
+    disconnected: "Aloqa uzildi, qayta ulanmoqda...",
+    // notification
+    new_order_notif: (id) => `🆕 Yangi buyurtma #${id}`,
+    new_order_tab: (n) => `(${n}) Yangi buyurtma!`,
+    client_default: "Mijoz",
+    no_time: "Vaqt yo'q", no_date: "Sana yo'q",
+    prev: "Oldingi", next: "Keyingi",
+  },
+  cy: {
+    status_new: "Янги", status_accepted: "Қабул қилинди", status_ready: "Тайёр",
+    status_delivered: "Етказилди", status_cancelled: "Бекор қилинди",
+    cash: "Нақд", payment_method: "Тўлов усули", payment_status: "Тўлов ҳолати",
+    click_paid: t?.click_paid || "Click орқали тўланди ✓", order_cancelled_pay: t?.order_cancelled_pay || "Буюртма бекор — тўлов амалга ошмади ✗",
+    pay_failed: t?.pay_failed || "Тўлов амалга ошмади ✗", pay_pending: t?.pay_pending || "Тўлов кутилмоқда...",
+    pay_time: "Тўланган вақт", pay_info: "Тўлов маълумотлари",
+    click_payment: "Click орқали тўлов", cash_payment: "Нақд пул тўлов",
+    paid: "Тўланди", pending: "Кутилмоқда", failed: "Муваффақиятсиз",
+    pickup: t.pickup, delivery: "Етказиб бериш",
+    delivery_fee: "Йўл ҳақи", set_fee: "Йўл ҳақини белгиланг",
+    fee_placeholder: "Йўл ҳақини киритинг", saved: "Сақланди!",
+    order: "Буюртма #", total: "Жами сумма", client: "Мижоз маълумотлари",
+    unknown: "Номаълум", no_phone: "Телефон йўқ", products: "Маҳсулотлар",
+    no_product: "Маҳсулот топилмади", address: "Манзил", no_address: "Манзил йўқ",
+    open_map: (t?.open_map || "Харитада очиш"), manage: "Буюртмани бошқариш",
+    accept: "Қабул", ready: "Тайёр", delivered: "Етказилди", delete: "Ўчириш",
+    history_manage: "Тарихни бошқариш",
+    orders: "Буюртмалар", products_menu: "Маҳсулотлар", stats: "Статистика",
+    subtitle: "{t.subtitle}",
+    enable_notif: "Хабарномаларни ёқиш", notif_enabled: "Хабарномалар ёқилган",
+    search: "Қидириш...", change: "Ўзгартириш",
+    today_orders: "Бугунги буюртмалар", today_helper: {t.today_helper},
+    new_orders: "Янги", new_helper: {t.new_helper},
+    delivered_orders: "Етказилган", delivered_helper: {t.delivered_helper},
+    paid_orders: "Тўланган", paid_helper: {t.paid_helper},
+    pending_orders: "Тўлов кутилмоқда", pending_helper: {t.pending_helper},
+    cancelled_orders: "Бекор қилинган", cancelled_helper: {t.cancelled_helper},
+    revenue_today: "Бугунги умумий тушум",
+    last_orders: t.last_orders, last_orders_sub: t.last_orders_sub,
+    orders_title: "Буюртмалар", clear_history: "Тарихни тозалаш",
+    all: "Барчаси", pay_filter_pending: "Кутилмоқда", no_orders: "Буюртма топилмади",
+    confirm_delete_order: t?.confirm_delete_order || "Ростдан ҳам бу буюртмани ўчирмоқчимисиз?",
+    confirm_clear_history: (n) => `Барча ${n} та тарих буюртмасини ўчирасизми?`,
+    per_page: (n) => `Ҳар саҳифада ${n} та буюртма`,
+    cat_order: t.cat_order, cat_order_sub: t.cat_order_sub,
+    order_placeholder: "Тартиб", save: "Сақлаш",
+    products_title: "Маҳсулотлар", product_count: (n) => `${n} та маҳсулот`,
+    add_product: "Маҳсулот қўшиш", active: "Актив", hidden: "Яширин",
+    edit: "Таҳрирлаш", hide: "Яшириш", show: "Очиш",
+    all_stats: t.all_stats, all_stats_sub: t.all_stats_sub,
+    total_orders: "Жами буюртмалар", total_delivered: "Етказилган",
+    total_paid: "Тўланган", total_cancelled: "Бекор қилинган",
+    cash_revenue: "Нақд тушум (жами)", click_revenue: "Click тушум (жами)",
+    total_revenue: "Умумий тушум", total_pending: "Тўлов кутилмоқда",
+    daily_stats: t.daily_stats, daily_stats_sub: t.daily_stats_sub,
+    no_daily: "Ҳозирча кунлик статистика йўқ",
+    daily_orders: "Кунлик жами заказ", daily_revenue: "Кунлик даромад",
+    daily_cash: "Нақд тушум", daily_click: "Click тушум",
+    stat_new: (n) => `Янги: ${n}`, stat_accepted: (n) => `Қабул қилинди: ${n}`,
+    stat_ready: (n) => `Тайёр: ${n}`, stat_delivered: (n) => `Етказилди: ${n}`,
+    stat_paid: (n) => `Тўланди: ${n}`, stat_pending: (n) => `Кутилмоқда: ${n}`,
+    stat_del_rev: (v) => `Етказилган даромад: ${v}`,
+    orders_count: (n) => `${n} та заказлар`,
+    days_count: (s, e, t) => `${s}–${e} / ${t} кун`,
+    form_add: "Янги маҳсулот қўшиш", form_edit: "Маҳсулотни таҳрирлаш",
+    id_placeholder: "ID / key", name_placeholder: "Маҳсулот номи",
+    price_placeholder: "Нарxi", category_placeholder: "Категория",
+    url_btn: t.url_btn, upload_btn: t.upload_btn,
+    img_url_placeholder: "Расм URL", img_preview: t.img_preview,
+    cancel: "Бекор қилиш",
+    connecting: "Уланмоқда...", connected: "Real-time уланди",
+    disconnected: "Алоқа узилди, қайта уланмоқда...",
+    new_order_notif: (id) => `🆕 Янги буюртма #${id}`,
+    new_order_tab: (n) => `(${n}) Янги буюртма!`,
+    client_default: "Мижоз",
+    no_time: t.no_time, no_date: t.no_date,
+    prev: "Олдинги", next: "Кейинги",
+  },
+  ru: {
+    status_new: "Новый", status_accepted: "Принят", status_ready: "Готов",
+    status_delivered: "Доставлен", status_cancelled: "Отменён",
+    cash: "Наличные", payment_method: "Способ оплаты", payment_status: "Статус оплаты",
+    click_paid: "Оплачено через Click ✓", order_cancelled_pay: "Заказ отменён — оплата не прошла ✗",
+    pay_failed: "Оплата не прошла ✗", pay_pending: "Ожидание оплаты...",
+    pay_time: "Время оплаты", pay_info: "Информация об оплате",
+    click_payment: "Оплата через Click", cash_payment: "Оплата наличными",
+    paid: "Оплачено", pending: "Ожидание", failed: "Ошибка",
+    pickup: "Самовывоз", delivery: "Доставка",
+    delivery_fee: "Стоимость доставки", set_fee: "Укажите стоимость доставки",
+    fee_placeholder: "Введите стоимость доставки", saved: "Сохранено!",
+    order: "Заказ #", total: "Итого", client: "Данные клиента",
+    unknown: "Неизвестно", no_phone: "Нет телефона", products: "Товары",
+    no_product: "Товар не найден", address: "Адрес", no_address: "Адрес не указан",
+    open_map: "Открыть на карте", manage: "Управление заказом",
+    accept: "Принять", ready: "Готово", delivered: "Доставлен", delete: "Удалить",
+    history_manage: "Управление историей",
+    orders: "Заказы", products_menu: "Товары", stats: "Статистика",
+    subtitle: "Заказы, товары и платежи работают в реальном времени.",
+    enable_notif: "Включить уведомления", notif_enabled: "Уведомления включены",
+    search: "Поиск...", change: "Изменить",
+    today_orders: "Заказы сегодня", today_helper: "Поступило сегодня",
+    new_orders: "Новые", new_helper: "Новые сегодня",
+    delivered_orders: "Доставлено", delivered_helper: "Доставлено сегодня",
+    paid_orders: "Оплачено", paid_helper: "Оплачено сегодня",
+    pending_orders: "Ожидание оплаты", pending_helper: "Click ожидание",
+    cancelled_orders: "Отменённые", cancelled_helper: "Отменено сегодня",
+    revenue_today: "Выручка сегодня",
+    last_orders: "Последние заказы", last_orders_sub: "Последние 3 заказа",
+    orders_title: "Заказы", clear_history: "Очистить историю",
+    all: "Все", pay_filter_pending: "Ожидание", no_orders: "Заказы не найдены",
+    confirm_delete_order: "Вы уверены, что хотите удалить этот заказ?",
+    confirm_clear_history: (n) => `Удалить все ${n} заказов из истории?`,
+    per_page: (n) => `По ${n} заказов на странице`,
+    cat_order: "Порядок категорий", cat_order_sub: "Порядок отображения в меню и miniapp",
+    order_placeholder: "Порядок", save: "Сохранить",
+    products_title: "Товары", product_count: (n) => `Товаров: ${n}`,
+    add_product: "Добавить товар", active: "Активен", hidden: "Скрыт",
+    edit: "Редактировать", hide: "Скрыть", show: "Показать",
+    all_stats: "Общая статистика", all_stats_sub: "Данные за всё время",
+    total_orders: "Всего заказов", total_delivered: "Доставлено",
+    total_paid: "Оплачено", total_cancelled: "Отменённые",
+    cash_revenue: "Выручка наличными (всего)", click_revenue: "Выручка Click (всего)",
+    total_revenue: "Общая выручка", total_pending: "Ожидание оплаты",
+    daily_stats: "Статистика по дням", daily_stats_sub: "Выручка и заказы по дням",
+    no_daily: "Статистика по дням пока отсутствует",
+    daily_orders: "Заказов за день", daily_revenue: "Выручка за день",
+    daily_cash: "Выручка наличными", daily_click: "Выручка Click",
+    stat_new: (n) => `Новые: ${n}`, stat_accepted: (n) => `Принято: ${n}`,
+    stat_ready: (n) => `Готово: ${n}`, stat_delivered: (n) => `Доставлено: ${n}`,
+    stat_paid: (n) => `Оплачено: ${n}`, stat_pending: (n) => `Ожидание: ${n}`,
+    stat_del_rev: (v) => `Выручка доставленных: ${v}`,
+    orders_count: (n) => `Заказов: ${n}`,
+    days_count: (s, e, t) => `${s}–${e} / ${t} дней`,
+    form_add: "Добавить товар", form_edit: "Редактировать товар",
+    id_placeholder: "ID / ключ", name_placeholder: "Название товара",
+    price_placeholder: "Цена", category_placeholder: "Категория",
+    url_btn: "Ссылка URL", upload_btn: "Загрузить",
+    img_url_placeholder: "URL изображения", img_preview: "Предпросмотр",
+    cancel: "Отмена",
+    connecting: "Подключение...", connected: "Подключено",
+    disconnected: "Соединение прервано, переподключение...",
+    new_order_notif: (id) => `🆕 Новый заказ #${id}`,
+    new_order_tab: (n) => `(${n}) Новый заказ!`,
+    client_default: "Клиент",
+    no_time: "Нет времени", no_date: "Нет даты",
+    prev: "Назад", next: "Вперёд",
+  },
 };
 
+// Saved lang from localStorage
+const savedLang = localStorage.getItem('admin_lang') || 'cy';
+
+function getStatusMap(t) {
+  return {
+    'Yangi buyurtma': { label: t.status_new, bg: '#dbeafe', color: '#1d4ed8' },
+    'Qabul qilindi': { label: t.status_accepted, bg: '#fef3c7', color: '#b45309' },
+    'Tayyor': { label: t.status_ready, bg: '#ede9fe', color: '#6d28d9' },
+    'Yetkazildi': { label: t.status_delivered, bg: '#d1fae5', color: '#047857' },
+    'Bekor qilindi': { label: t.status_cancelled, bg: '#fee2e2', color: '#b91c1c' },
+  };
+}
+const statusMap = getStatusMap({ status_new:'Янги', status_accepted:'Қабул қилинди', status_ready:'Тайёр', status_delivered:'Етказилди', status_cancelled:'Бекор қилинди' });
+
 function formatPrice(value) {
-  return new Intl.NumberFormat('uz-UZ').format(Number(value || 0)) + " so'm";
+  return new Intl.NumberFormat('uz-UZ').format(Number(value || 0)) + " сўм";
 }
 
 function formatDateTime(value) {
-  if (!value) return "Vaqt yo'q";
+  if (!value) return t.no_time;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Vaqt yo'q";
+  if (Number.isNaN(date.getTime())) return t.no_time;
   return new Intl.DateTimeFormat('uz-UZ', {
     year: 'numeric',
     month: '2-digit',
@@ -66,9 +296,9 @@ function formatDateTime(value) {
 }
 
 function formatDateOnly(value) {
-  if (!value) return "Sana yo'q";
+  if (!value) return t.no_date;
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Sana yo'q";
+  if (Number.isNaN(date.getTime())) return t.no_date;
   return new Intl.DateTimeFormat('uz-UZ', {
     year: 'numeric',
     month: '2-digit',
@@ -144,7 +374,7 @@ function startTabBlink(count) {
   let blink = false;
   titleBlinkInterval = setInterval(() => {
     document.title = blink
-    ? `(${count}) Yangi buyurtma!`
+    ? t.new_order_tab(count)
     : `🔴 (${count}) Admin Panel`;
     blink = !blink;
   }, 800);
@@ -172,12 +402,12 @@ function showBrowserNotification(order) {
   if (!('Notification' in window)) return;
   if (Notification.permission !== 'granted') return;
   
-  const title = `🆕 Yangi buyurtma #${order.id}`;
+  const title = t.new_order_notif(order.id);
   const body = [
-    `👤 ${order.name || 'Mijoz'}`,
+    `👤 ${order.name || t.client_default}`,
     `💰 ${new Intl.NumberFormat('uz-UZ').format(Number(order.total || 0))} so'm`,
-    `📦 ${order.deliveryType === 'pickup' ? "O'zi olib ketadi" : 'Yetkazib berish'}`,
-    `💳 ${order.paymentMethod === 'click' ? 'Click' : 'Naqd'}`,
+    `📦 ${order.deliveryType === 'pickup' ? t.pickup : t.delivery}`,
+    `💳 ${order.paymentMethod === 'click' ? 'Click' : 'Наличные'}`,
   ].join('\n');
   
   try {
@@ -197,18 +427,18 @@ function showBrowserNotification(order) {
 }
 
 function getPaymentMethodText(paymentMethod) {
-  return paymentMethod === 'click' ? 'Click' : 'Naqd';
+  return paymentMethod === 'click' ? 'Click' : t.cash;
 }
 
 function getPaymentStatusText(paymentStatus) {
-  if (paymentStatus === 'paid') return "To'langan";
-  if (paymentStatus === 'failed') return 'Muvaffaqiyatsiz';
-  return 'Kutilmoqda';
+  if (paymentStatus === 'paid') return t.paid;
+  if (paymentStatus === 'failed') return t.failed;
+  return t.pending;
 }
 
 function getDeliveryTypeText(order) {
-  if (order?.deliveryType === 'pickup') return "O'zi olib ketadi";
-  return "Yetkazib berish";
+  if (order?.deliveryType === 'pickup') return t.pickup;
+  return t.delivery;
 }
 
 function getLocationData(order) {
@@ -378,8 +608,9 @@ function StatCard({ title, value, helper, icon: Icon, dark = false }) {
   );
 }
 
-function Badge({ status }) {
-  const conf = statusMap[status] || { label: status, bg: '#e2e8f0', color: '#334155' };
+function Badge({ status, statusMap: sm }) {
+  const map = sm || statusMap;
+  const conf = map[status] || { label: status, bg: '#e2e8f0', color: '#334155' };
   return (
     <span
     style={{
@@ -400,16 +631,16 @@ function Badge({ status }) {
 }
 
 function PaymentBadge({ paymentStatus, paymentMethod }) {
-  // Naqd + pending bo'lsa badge ko'rsatilmaydi
+  // Наличные + pending bo'lsa badge ko'rsatilmaydi
   const isCash = !paymentMethod || paymentMethod === 'cash';
   const isPending = !paymentStatus || paymentStatus === 'pending';
   if (isCash && isPending) return null;
   
   let bg = '#fef3c7';
   let color = '#b45309';
-  let label = 'Kutilmoqda';
-  if (paymentStatus === 'paid') { bg = '#d1fae5'; color = '#047857'; label = "To'langan"; }
-  if (paymentStatus === 'failed') { bg = '#fee2e2'; color = '#b91c1c'; label = 'Muvaffaqiyatsiz'; }
+  let label = t.pending;
+  if (paymentStatus === 'paid') { bg = '#d1fae5'; color = '#047857'; label = t.paid; }
+  if (paymentStatus === 'failed') { bg = '#fee2e2'; color = '#b91c1c'; label = t.failed; }
   return (
     <span
     style={{
@@ -445,7 +676,7 @@ function MethodBadge({ paymentMethod }) {
       fontWeight: 800,
     }}
     >
-    {isClick ? 'Click' : 'Naqd'}
+    {isClick ? 'Click' : t.cash}
     </span>
   );
 }
@@ -508,7 +739,7 @@ function InfoLine({ icon: Icon, text, link }) {
 }
 
 // Yo'l haqi belgilash komponenti (faqat delivery)
-function DeliveryFeeBox({ order, onDeliveryFeeUpdate }) {
+function DeliveryFeeBox({ order, onDeliveryFeeUpdate, t = TRANSLATIONS.cy }) {
   const [fee, setFee] = React.useState(order.deliveryFee ? String(order.deliveryFee) : '');
   const [saving, setSaving] = React.useState(false);
   const [saved, setSaved] = React.useState(order.deliveryFee > 0); // refresh da ham to'g'ri ko'rinadi
@@ -524,28 +755,28 @@ function DeliveryFeeBox({ order, onDeliveryFeeUpdate }) {
       border: `1px solid ${hasFee ? '#a7f3d0' : '#fde68a'}`,
     }}>
     <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
-    🚗 Yo'l haqi
+    🚗 Йўл ҳақи
     </div>
     {hasFee ? (
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
       <span style={{ fontSize: 16, fontWeight: 800, color: '#047857' }}>
-      {new Intl.NumberFormat('uz-UZ').format(order.deliveryFee)} so'm
+      {new Intl.NumberFormat('uz-UZ').format(order.deliveryFee)} сўм
       </span>
       <button
       onClick={() => { setFee(String(order.deliveryFee)); setSaved(false); }}
       style={{ fontSize: 12, color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
       >
-      O'zgartirish
+      Ўзгартириш
       </button>
       </div>
     ) : (
       <div style={{ fontSize: 12, color: '#b45309', fontWeight: 600, marginBottom: 8 }}>
-      Yo'l haqini belgilang
+      Йўл ҳақини белгиланг
       </div>
     )}
     {saved ? (
       <div style={{ fontSize: 13, fontWeight: 700, color: '#047857', padding: '8px 0' }}>
-      Saqlandi!
+      Сақланди!
       </div>
     ) : (
       <div style={{ display: 'flex', gap: 8 }}>
@@ -553,7 +784,7 @@ function DeliveryFeeBox({ order, onDeliveryFeeUpdate }) {
       type="number"
       value={fee}
       onChange={(e) => setFee(e.target.value)}
-      placeholder="Yo'l haqini kiriting"
+      placeholder={t?.fee_placeholder || "Йўл ҳақини киритинг"}
       style={{
         flex: 1, padding: '9px 12px', borderRadius: 12,
         border: '1px solid #dbe2ea', outline: 'none',
@@ -566,7 +797,7 @@ function DeliveryFeeBox({ order, onDeliveryFeeUpdate }) {
         setSaving(true);
         await onDeliveryFeeUpdate(order.id, Number(fee));
         setSaving(false);
-        setSaved(true); // Faqat O'zgartirish bosilganda yashiriladi
+        setSaved(true); // Скрывается только при нажатии Ўзгартириш
       }}
       style={{
         padding: '9px 14px', borderRadius: 12, border: 'none',
@@ -577,7 +808,7 @@ function DeliveryFeeBox({ order, onDeliveryFeeUpdate }) {
         whiteSpace: 'nowrap',
       }}
       >
-      {saving ? '...' : 'Saqlash'}
+      {saving ? '...' : (t?.save || 'Сақлаш')}
       </button>
       </div>
     )}
@@ -585,8 +816,8 @@ function DeliveryFeeBox({ order, onDeliveryFeeUpdate }) {
   );
 }
 
-// To'lov ma'lumotlari ko'rsatish komponenti
-function PaymentInfoBox({ order }) {
+// Тўлов маълумотлари ko'rsatish komponenti
+function PaymentInfoBox({ order, t = TRANSLATIONS.cy }) {
   const isClick = order.paymentMethod === 'click';
   const isPaid = order.paymentStatus === 'paid';
   const isFailed = order.paymentStatus === 'failed';
@@ -604,11 +835,11 @@ function PaymentInfoBox({ order }) {
     }}
     >
     <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>
-    To'lov ma'lumotlari
+    Тўлов маълумотлари
     </div>
     
     <div style={{ display: 'grid', gap: 10 }}>
-    {/* To'lov usuli */}
+    {/* Тўлов усули */}
     <div
     style={{
       display: 'flex',
@@ -626,14 +857,14 @@ function PaymentInfoBox({ order }) {
       <Wallet size={16} color="#047857" />
     )}
     <div>
-    <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>To'lov usuli</div>
+    <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>{t?.payment_method || 'Тўлов усули'}</div>
     <div style={{ fontSize: 14, fontWeight: 800, color: isClick ? '#1d4ed8' : '#047857' }}>
-    {isClick ? "Click orqali to'lov" : "Naqd pul to'lov"}
+    {isClick ? "Click орқали тўлов" : "Нақд пул тўлов"}
     </div>
     </div>
     </div>
     
-    {/* To'lov holati — faqat Click uchun */}
+    {/* Тўлов ҳолати — только для Click */}
     {isClick && (
       <div
       style={{
@@ -654,7 +885,7 @@ function PaymentInfoBox({ order }) {
         <Clock3 size={16} color="#b45309" />
       )}
       <div>
-      <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>To'lov holati</div>
+      <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>{t?.payment_status || 'Тўлов ҳолати'}</div>
       <div
       style={{
         fontSize: 14,
@@ -663,18 +894,18 @@ function PaymentInfoBox({ order }) {
       }}
       >
       {isPaid
-        ? "Click orqali to'langan ✓"
+        ? t?.click_paid || "Click орқали тўланди ✓"
         : isCancelled
-        ? "Buyurtma bekor — to'lov amalga oshmadi ✗"
+        ? t?.order_cancelled_pay || "Буюртма бекор — тўлов амалга ошмади ✗"
         : isFailed
-        ? "To'lov amalga oshmadi ✗"
-        : "To'lov kutilmoqda..."}
+        ? t?.pay_failed || "Тўлов амалга ошмади ✗"
+        : t?.pay_pending || "Тўлов кутилмоқда..."}
         </div>
         </div>
         </div>
       )}
       
-      {/* To'langan vaqt */}
+      {/* Тўланган вақт */}
       {order.paidAt && isPaid && (
         <div
         style={{
@@ -689,7 +920,7 @@ function PaymentInfoBox({ order }) {
         >
         <Clock3 size={15} color="#64748b" />
         <div>
-        <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>To'langan vaqt</div>
+        <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>{t?.pay_time || 'Тўланган вақт'}</div>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>
         {formatDateTime(order.paidAt)}
         </div>
@@ -744,10 +975,10 @@ function PaymentInfoBox({ order }) {
       {/* Chap: ID + badge-lar */}
       <div style={{ flex: 1, minWidth: 0 }}>
       <div style={{ fontSize: isMobile ? 17 : 22, fontWeight: 800, color: '#0f172a' }}>
-      Buyurtma #{order.id}
+      Буюртма #{order.id}
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-      <Badge status={order.status} />
+      <Badge status={order.status} statusMap={getStatusMap(t)} />
       <MethodBadge paymentMethod={order.paymentMethod} />
       <PaymentBadge paymentStatus={order.paymentStatus} paymentMethod={order.paymentMethod} />
       </div>
@@ -761,7 +992,7 @@ function PaymentInfoBox({ order }) {
         color: '#ffffff',
         flexShrink: 0,
       }}>
-      <div style={{ fontSize: 11, color: '#cbd5e1' }}>Jami summa</div>
+      <div style={{ fontSize: 11, color: '#cbd5e1' }}>{t?.total || 'Жами сумма'}</div>
       <div style={{ marginTop: 4, fontSize: isMobile ? 20 : 28, fontWeight: 800, whiteSpace: 'nowrap' }}>
       {formatPrice(order.total || 0)}
       </div>
@@ -774,7 +1005,7 @@ function PaymentInfoBox({ order }) {
         /* ---- MOBIL LAYOUT ---- */
         <div style={{ padding: 14, display: 'grid', gap: 12 }}>
         
-        {/* Mijoz ma'lumotlari - compact */}
+        {/* Мижоз маълумотлари - compact */}
         <div style={{
           padding: 14,
           borderRadius: 16,
@@ -782,18 +1013,18 @@ function PaymentInfoBox({ order }) {
           border: '1px solid #eef2f7',
         }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
-        Mijoz ma'lumotlari
+        Мижоз маълумотлари
         </div>
         <div style={{ display: 'grid', gap: 8 }}>
-        <InfoLine icon={Eye} text={order.name || "Noma'lum"} />
-        <InfoLine icon={Phone} text={order.phone || "Telefon yo'q"} />
+        <InfoLine icon={Eye} text={order.name || (t?.unknown || "Номаълум")} />
+        <InfoLine icon={Phone} text={order.phone || (t?.no_phone || "Телефон йўқ")} />
         <InfoLine icon={AtSign} text={username} />
         <InfoLine icon={Clock3} text={formatDateTime(order.createdAt)} />
         <InfoLine icon={Truck} text={getDeliveryTypeText(order)} />
         </div>
         </div>
         
-        {/* Mahsulotlar */}
+        {/* Маҳсулотлар */}
         <div style={{
           padding: 14,
           borderRadius: 16,
@@ -801,10 +1032,10 @@ function PaymentInfoBox({ order }) {
           border: '1px solid #eef2f7',
         }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
-        Mahsulotlar
+        Маҳсулотлар
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {(items.length ? items : ['Mahsulot topilmadi']).map((item, idx) => (
+        {(items.length ? items : [(t?.no_product || 'Маҳсулот топилмади')]).map((item, idx) => (
           <span key={idx} style={{
             padding: '6px 10px',
             borderRadius: 999,
@@ -819,7 +1050,7 @@ function PaymentInfoBox({ order }) {
         </div>
         </div>
         
-        {/* Manzil */}
+        {/* Манзил */}
         <div style={{
           padding: 14,
           borderRadius: 16,
@@ -827,25 +1058,25 @@ function PaymentInfoBox({ order }) {
           border: '1px solid #eef2f7',
         }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
-        Manzil
+        Манзил
         </div>
         {location.text
           ? <InfoLine icon={MapPin} text={location.text} />
-          : <InfoLine icon={MapPin} text="Manzil yo'q" />
+          : <InfoLine icon={MapPin} text="Манзил йўқ" />
         }
         {location.hasCoords && (
           <div style={{ marginTop: 8 }}>
-          <InfoLine icon={MapPin} text="Xaritada ochish" link={location.link} />
+          <InfoLine icon={MapPin} text=(t?.open_map || "Харитада очиш") link={location.link} />
           </div>
         )}
         </div>
         
         {/* Yo'l haqi */}
-        <DeliveryFeeBox order={order} onDeliveryFeeUpdate={onDeliveryFeeUpdate} />
-        {/* To'lov ma'lumotlari */}
-        <PaymentInfoBox order={order} />
+        <DeliveryFeeBox order={order} onDeliveryFeeUpdate={onDeliveryFeeUpdate} t={t} />
+        {/* Тўлов маълумотлари */}
+        <PaymentInfoBox order={order} t={t} />
         
-        {/* Buyurtma boshqaruvi tugmalari */}
+        {/* Буюртмани бошқариш tugmalari */}
         {!hideActions ? (
           <div style={{
             padding: 14,
@@ -854,7 +1085,7 @@ function PaymentInfoBox({ order }) {
             border: '1px solid #eef2f7',
           }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
-          Buyurtma boshqaruvi
+          Буюртмани бошқариш
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
           <Button
@@ -863,7 +1094,7 @@ function PaymentInfoBox({ order }) {
           style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '10px 6px', fontSize: 11, width: '100%' }}
           >
           <CheckCircle2 size={16} />
-          <span>Qabul</span>
+          <span>{t?.accept || 'Қабул'}</span>
           </Button>
           <Button
           onClick={() => onStatusChange(order.id, 'Tayyor')}
@@ -871,7 +1102,7 @@ function PaymentInfoBox({ order }) {
           style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '10px 6px', fontSize: 11, width: '100%' }}
           >
           <ChefHat size={16} />
-          <span>Tayyor</span>
+          <span>{t?.ready || 'Тайёр'}</span>
           </Button>
           <Button
           onClick={() => onStatusChange(order.id, 'Yetkazildi')}
@@ -879,7 +1110,7 @@ function PaymentInfoBox({ order }) {
           style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '10px 6px', fontSize: 11, width: '100%' }}
           >
           <PackageCheck size={16} />
-          <span>Yetkazildi</span>
+          <span>{t?.delivered || 'Етказилди'}</span>
           </Button>
           </div>
           </div>
@@ -888,7 +1119,7 @@ function PaymentInfoBox({ order }) {
           onClick={() => onDeleteOrder(order.id)}
           style={{ width: '100%', background: '#fee2e2', color: '#991b1b', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
           >
-          <Trash2 size={15} /> O'chirish
+          <Trash2 size={15} /> {t?.delete || 'Ўчириш'}
           </Button>
         )}
         </div>
@@ -900,22 +1131,22 @@ function PaymentInfoBox({ order }) {
           gridTemplateColumns: contentColumns,
           gap: 20,
         }}>
-        {/* 1-ustun: Mijoz ma'lumotlari */}
+        {/* 1-ustun: Мижоз маълумотлари */}
         <div style={{ display: 'grid', gap: 12 }}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>Mijoz ma'lumotlari</div>
-        <InfoLine icon={Eye} text={order.name || "Noma'lum"} />
-        <InfoLine icon={Phone} text={order.phone || "Telefon yo'q"} />
+        <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>{t?.client || 'Мижоз маълумотлари'}</div>
+        <InfoLine icon={Eye} text={order.name || (t?.unknown || "Номаълум")} />
+        <InfoLine icon={Phone} text={order.phone || (t?.no_phone || "Телефон йўқ")} />
         <InfoLine icon={AtSign} text={username} />
         <InfoLine icon={Clock3} text={formatDateTime(order.createdAt)} />
         <InfoLine icon={Truck} text={getDeliveryTypeText(order)} />
         </div>
         
-        {/* 2-ustun: Mahsulotlar + Manzil */}
+        {/* 2-ustun: Маҳсулотлар + Манзил */}
         <div style={{ display: 'grid', gap: 14 }}>
         <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc', border: '1px solid #eef2f7' }}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>Mahsulotlar</div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>{t?.products || 'Маҳсулотлар'}</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {(items.length ? items : ['Mahsulot topilmadi']).map((item, idx) => (
+        {(items.length ? items : [(t?.no_product || 'Маҳсулот топилмади')]).map((item, idx) => (
           <span key={idx} style={{
             padding: '8px 12px',
             borderRadius: 999,
@@ -931,28 +1162,28 @@ function PaymentInfoBox({ order }) {
         </div>
         
         <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc', border: '1px solid #eef2f7' }}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>Manzil</div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>{t?.address || 'Манзил'}</div>
         {location.text
           ? <InfoLine icon={MapPin} text={location.text} />
-          : <InfoLine icon={MapPin} text="Manzil yo'q" />
+          : <InfoLine icon={MapPin} text="Манзил йўқ" />
         }
         {location.hasCoords && (
           <div style={{ marginTop: 8 }}>
-          <InfoLine icon={MapPin} text="Xaritada ochish" link={location.link} />
+          <InfoLine icon={MapPin} text=(t?.open_map || "Харитада очиш") link={location.link} />
           </div>
         )}
         </div>
         </div>
         
-        {/* 3-ustun: To'lov + Yo'l haqi + Buyurtma boshqaruvi */}
+        {/* 3-ustun: To'lov + Yo'l haqi + Буюртмани бошқариш */}
         <div style={{ display: 'grid', gap: 14 }}>
-        <DeliveryFeeBox order={order} onDeliveryFeeUpdate={onDeliveryFeeUpdate} />
-        <PaymentInfoBox order={order} />
+        <DeliveryFeeBox order={order} onDeliveryFeeUpdate={onDeliveryFeeUpdate} t={t} />
+        <PaymentInfoBox order={order} t={t} />
         
         {!hideActions ? (
           <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc', border: '1px solid #eef2f7' }}>
           <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
-          Buyurtma boshqaruvi
+          Буюртмани бошқариш
           </div>
           <div style={{ display: 'grid', gap: 10 }}>
           <Button
@@ -960,34 +1191,34 @@ function PaymentInfoBox({ order }) {
           disabled={!canAccept}
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%' }}
           >
-          <CheckCircle2 size={15} /> Qabul qilindi
+          <CheckCircle2 size={15} /> {t?.status_accepted || 'Қабул қилинди'}
           </Button>
           <Button
           onClick={() => onStatusChange(order.id, 'Tayyor')}
           disabled={!canReady}
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%' }}
           >
-          <ChefHat size={15} /> Tayyor
+          <ChefHat size={15} /> {t?.status_ready || 'Тайёр'}
           </Button>
           <Button
           onClick={() => onStatusChange(order.id, 'Yetkazildi')}
           disabled={!canDeliver}
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%' }}
           >
-          <PackageCheck size={15} /> Yetkazildi
+          <PackageCheck size={15} /> {t?.status_delivered || 'Етказилди'}
           </Button>
           </div>
           </div>
         ) : (
           <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc', border: '1px solid #eef2f7' }}>
           <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>
-          History boshqaruvi
+          Тарихни бошқариш
           </div>
           <Button
           onClick={() => onDeleteOrder(order.id)}
           style={{ width: '100%', background: '#fee2e2', color: '#991b1b', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
           >
-          <Trash2 size={15} /> O'chirish
+          <Trash2 size={15} /> {t?.delete || 'Ўчириш'}
           </Button>
           </div>
         )}
@@ -1021,7 +1252,7 @@ function PaymentInfoBox({ order }) {
     const clickRevenue = activeTodayOrders
     .filter((o) => o.paymentMethod === 'click' && o.paymentStatus === 'paid')
     .reduce((sum, o) => sum + Number(o.total || 0), 0);
-    // Naqd + bekor qilinmagan = to'langan; Click + paid = to'langan
+    // Наличные + bekor qilinmagan = to'langan; Click + paid = to'langan
     const paidOrders = todayOrders.filter((o) =>
       o.status !== 'Bekor qilindi' && (
       o.paymentStatus === 'paid' ||
@@ -1116,7 +1347,7 @@ function Pagination({ currentPage, totalPages, onPageChange, isMobile = false })
     style={{ display: 'flex', alignItems: 'center', gap: 6 }}
     >
     <ChevronLeft size={16} />
-    {!isMobile ? 'Oldingi' : ''}
+    {!isMobile ? t.prev : ''}
     </Button>
     {pages.map((page) => (
       <button
@@ -1141,7 +1372,7 @@ function Pagination({ currentPage, totalPages, onPageChange, isMobile = false })
     disabled={currentPage === totalPages}
     style={{ display: 'flex', alignItems: 'center', gap: 6 }}
     >
-    {!isMobile ? 'Keyingi' : ''}
+    {!isMobile ? t.next : ''}
     <ChevronRight size={16} />
     </Button>
     </div>
@@ -1150,6 +1381,14 @@ function Pagination({ currentPage, totalPages, onPageChange, isMobile = false })
 
 export default function App() {
   const { isMobile, isTablet, isSmallMobile } = useResponsive();
+  
+  const [lang, setLang] = useState(() => localStorage.getItem('admin_lang') || 'cy');
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.cy;
+  
+  function changeLang(l) {
+    setLang(l);
+    localStorage.setItem('admin_lang', l);
+  }
   
   const [page, setPage] = useState('dashboard');
   const [orders, setOrders] = useState([]);
@@ -1188,7 +1427,7 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [streamStatus, setStreamStatus] = useState('Ulanmoqda...');
+  const [streamStatus, setStreamStatus] = useState(t.connecting);
   const [orderPage, setOrderPage] = useState(1);
   const [imageMode, setImageMode] = useState('url');
   const [orderTab, setOrderTab] = useState('active');
@@ -1262,7 +1501,7 @@ export default function App() {
         setAllStatsData(buildAllStatsFromOrders(safeOrders));
       }
     } catch (error) {
-      console.error("Ma'lumotlarni yuklashda xato:", error);
+      console.error("Маълумотларни юклашда хато:", error);
     }
   }
   
@@ -1281,7 +1520,7 @@ export default function App() {
       } catch {}
       loadData();
     };
-    eventSource.onerror = () => setStreamStatus('Aloqa uzildi, qayta ulanmoqda...');
+    eventSource.onerror = () => setStreamStatus(t.disconnected);
     return () => eventSource.close();
   }, []);
   
@@ -1367,7 +1606,7 @@ export default function App() {
       clearTabNotification();
       await loadData();
     } catch (error) {
-      console.error('Statusni yangilashda xato:', error);
+      console.error('Статусни янгилашда хато:', error);
     }
   }
   
@@ -1380,18 +1619,18 @@ export default function App() {
       });
       await loadData();
     } catch (error) {
-      console.error("Yo'l haqini belgilashda xato:", error);
+      console.error("Йўл ҳақини белгилашда хато:", error);
     }
   }
   
   async function handleDeleteOrder(id) {
-    const ok = window.confirm("Rostdan ham bu buyurtmani o'chirmoqchimisiz?");
+    const ok = window.confirm(t?.confirm_delete_order || "Ростдан ҳам бу буюртмани ўчирмоқчимисиз?");
     if (!ok) return;
     try {
       await fetch(`${API}/orders/${id}`, { method: 'DELETE' });
       await loadData();
     } catch (error) {
-      console.error("Buyurtmani o'chirishda xato:", error);
+      console.error("Буюртмани ўчиришда хато:", error);
     }
   }
   
@@ -1441,7 +1680,7 @@ export default function App() {
       setShowForm(false);
       await loadData();
     } catch (error) {
-      console.error('Mahsulotni saqlashda xato:', error);
+      console.error('Маҳсулотни сақлашда хато:', error);
     }
   }
   
@@ -1454,7 +1693,7 @@ export default function App() {
       });
       await loadData();
     } catch (error) {
-      console.error("Mahsulot holatini o'zgartirishda xato:", error);
+      console.error("Маҳсулот ҳолатини ўзгартиришда хато:", error);
     }
   }
   
@@ -1463,7 +1702,7 @@ export default function App() {
       await fetch(`${API}/menu/${product.key}`, { method: 'DELETE' });
       await loadData();
     } catch (error) {
-      console.error("Mahsulotni o'chirishda xato:", error);
+      console.error("Маҳсулотни ўчиришда хато:", error);
     }
   }
   
@@ -1587,10 +1826,21 @@ export default function App() {
       </div>
       <div style={{ display: 'grid', gap: 8 }}>
       <SidebarItem active={page === 'dashboard'} icon={LayoutDashboard} label="Dashboard" onClick={() => handleMenuClick('dashboard')} />
-      <SidebarItem active={page === 'orders'} icon={ShoppingBag} label="Buyurtmalar" onClick={() => handleMenuClick('orders')} />
-      <SidebarItem active={page === 'products'} icon={Package} label="Mahsulotlar" onClick={() => handleMenuClick('products')} />
-      <SidebarItem active={page === 'stats'} icon={BarChart3} label="Statistika" onClick={() => handleMenuClick('stats')} />
+      <SidebarItem active={page === 'orders'} icon={ShoppingBag} label={t.orders} onClick={() => handleMenuClick('orders')} />
+      <SidebarItem active={page === 'products'} icon={Package} label={t.products_menu} onClick={() => handleMenuClick('products')} />
+      <SidebarItem active={page === 'stats'} icon={BarChart3} label={t.stats} onClick={() => handleMenuClick('stats')} />
       <SidebarItem active={false} icon={LogOut} label="Logout" onClick={handleLogout} />
+      {/* Til almashtirgich */}
+      <div style={{ marginTop: 12, display: 'flex', gap: 6, padding: '0 4px' }}>
+      {[['uz', "O'zbek"], ['cy', 'Ўзбек'], ['ru', 'Рус']].map(([code, name]) => (
+        <button key={code} onClick={() => changeLang(code)} style={{
+          flex: 1, padding: '8px 4px', borderRadius: 12, border: 'none',
+          background: lang === code ? '#E8321A' : '#f1f5f9',
+          color: lang === code ? '#fff' : '#475569',
+          fontWeight: 700, fontSize: 11, cursor: 'pointer',
+        }}>{name}</button>
+      ))}
+      </div>
       </div>
       </Card>
       </div>
@@ -1604,7 +1854,7 @@ export default function App() {
       <div>
       <div style={{ fontSize: 38, fontWeight: 800, color: '#0f172a' }}>Admin Panel</div>
       <div style={{ color: '#64748b', marginTop: 6 }}>
-      Buyurtmalar, mahsulotlar va to'lovlar real ma'lumotlar bilan ishlayapti.
+      Заказы, товары и платежи работают с реальными данными.
       </div>
       <div style={{ color: '#16a34a', marginTop: 6, fontSize: 13, fontWeight: 700 }}>
       {streamStatus}
@@ -1622,15 +1872,15 @@ export default function App() {
           color: '#b45309', fontWeight: 700, fontSize: 13,
           cursor: 'pointer', flexShrink: 0,
         }}
-        title="Yangi buyurtma xabarnomalarini yoqish"
+        title={t.enable_notif}
         >
         <Bell size={16} />
-        Xabarnomalarni yoqish
+        Хабарномаларни ёқиш
         </button>
       )}
       {typeof Notification !== 'undefined' && Notification.permission === 'granted' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#047857', fontWeight: 700 }}>
-        <Bell size={15} /> Xabarnomalar yoqilgan
+        <Bell size={15} /> Хабарномалар ёқилган
         </div>
       )}
       <div style={{ position: 'relative', width: 280 }}>
@@ -1638,7 +1888,7 @@ export default function App() {
       <Input
       value={search}
       onChange={(e) => setSearch(e.target.value)}
-      placeholder="Qidirish..."
+      placeholder={t.search}
       style={{ paddingLeft: 36 }}
       />
       </div>
@@ -1654,7 +1904,7 @@ export default function App() {
       <Input
       value={search}
       onChange={(e) => setSearch(e.target.value)}
-      placeholder="Qidirish..."
+      placeholder={t.search}
       style={{ paddingLeft: 36 }}
       />
       </div>
@@ -1662,26 +1912,26 @@ export default function App() {
     )}
     
     <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : isTablet ? 'repeat(3, 1fr)' : 'repeat(6, 1fr)', gap: 16 }}>
-    <StatCard title="Bugungi buyurtmalar" value={statsData?.totalOrders ?? 0} icon={ShoppingBag} helper="Bugun tushgan" />
-    <StatCard title="Yangi" value={statsData?.newOrders ?? 0} icon={Bell} helper="Bugungi yangilar" />
-    <StatCard title="Yetkazilgan" value={statsData?.deliveredOrders ?? 0} icon={PackageCheck} helper="Bugun yetkazilgan" />
-    <StatCard title="To'langan" value={statsData?.paidOrders ?? 0} icon={Wallet} helper="Bugun to'langan" />
-    <StatCard title="To'lov kutilmoqda" value={statsData?.pendingPaymentOrders ?? 0} icon={Clock3} helper="Click pending" />
-    <StatCard title="Bekor qilingan" value={statsData?.cancelledOrders ?? 0} icon={X} helper="Bugun bekor" />
+    <StatCard title={t.today_orders} value={statsData?.totalOrders ?? 0} icon={ShoppingBag} helper="Сегодня поступило" />
+    <StatCard title={t.new_orders} value={statsData?.newOrders ?? 0} icon={Bell} helper={t.new_helper} />
+    <StatCard title={t.delivered_orders} value={statsData?.deliveredOrders ?? 0} icon={PackageCheck} helper={t.delivered_helper} />
+    <StatCard title={t.paid_orders} value={statsData?.paidOrders ?? 0} icon={Wallet} helper={t.paid_helper} />
+    <StatCard title={t.pending_orders} value={statsData?.pendingPaymentOrders ?? 0} icon={Clock3} helper={t.pending_helper} />
+    <StatCard title={t.cancelled_orders} value={statsData?.cancelledOrders ?? 0} icon={X} helper={t.cancelled_helper} />
     </div>
     
-    {/* Bugungi umumiy tushum */}
+    {/* Бугунги умумий тушум */}
     <Card style={{ background: '#0f172a', color: '#ffffff' }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
     <div>
-    <div style={{ fontSize: 14, color: '#94a3b8', fontWeight: 600 }}>Bugungi umumiy tushum</div>
+    <div style={{ fontSize: 14, color: '#94a3b8', fontWeight: 600 }}>{t.revenue_today}</div>
     <div style={{ fontSize: isMobile ? 28 : 36, fontWeight: 800, marginTop: 6 }}>
     {formatPrice((statsData?.cashRevenue ?? 0) + (statsData?.clickRevenue ?? 0))}
     </div>
     </div>
     <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
     <div style={{ textAlign: 'right' }}>
-    <div style={{ fontSize: 12, color: '#64748b' }}>Naqd</div>
+    <div style={{ fontSize: 12, color: '#64748b' }}>{t.cash}</div>
     <div style={{ fontSize: 18, fontWeight: 800, color: '#34d399' }}>{formatPrice(statsData?.cashRevenue ?? 0)}</div>
     </div>
     <div style={{ textAlign: 'right' }}>
@@ -1695,7 +1945,7 @@ export default function App() {
     {page === 'dashboard' && (
       <>
       <Card>
-      <SectionTitle title="So'nggi buyurtmalar" subtitle="Oxirgi 3 ta buyurtma" isMobile={isMobile} />
+      <SectionTitle title=t.last_orders subtitle=t.last_orders_sub isMobile={isMobile} />
       <div style={{ display: 'grid', gap: 16, marginTop: 18 }}>
       {filteredOrders.slice(0, 3).map((order) => (
         <OrderCard
@@ -1716,14 +1966,14 @@ export default function App() {
     {page === 'orders' && (
       <Card>
       <SectionTitle
-      title="Buyurtmalar"
-      subtitle={`Har sahifada ${ORDERS_PER_PAGE} ta buyurtma`}
+      title={t.orders_title}
+      subtitle={t.per_page(ORDERS_PER_PAGE)}
       isMobile={isMobile}
       right={
         orderTab === 'history' && historyOrders.length > 0 ? (
           <button
           onClick={async () => {
-            if (!window.confirm(`Barcha ${historyOrders.length} ta tarix buyurtmasini o'chirasizmi?`)) return;
+            if (!window.confirm(t.confirm_clear_history(historyOrders.length))) return;
             await fetch(`${API}/orders/history/all`, { method: 'DELETE' });
             await loadData();
           }}
@@ -1734,7 +1984,7 @@ export default function App() {
             display: 'flex', alignItems: 'center', gap: 6
           }}
           >
-          <span>🗑</span> Tarixni tozalash
+          <span>🗑</span> {t.clear_history}
           </button>
         ) : null
       }
@@ -1747,14 +1997,14 @@ export default function App() {
       <FilterChip small active={orderTab === 'history'} onClick={() => setOrderTab('history')}>History</FilterChip>
       </div>
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
-      <FilterChip small active={paymentFilter === 'all'} onClick={() => setPaymentFilter('all')}>Barchasi</FilterChip>
-      <FilterChip small active={paymentFilter === 'cash'} onClick={() => setPaymentFilter('cash')}>Naqd</FilterChip>
+      <FilterChip small active={paymentFilter === 'all'} onClick={() => setPaymentFilter('all')}>{t.all}</FilterChip>
+      <FilterChip small active={paymentFilter === 'cash'} onClick={() => setPaymentFilter('cash')}>{t.cash}</FilterChip>
       <FilterChip small active={paymentFilter === 'click'} onClick={() => setPaymentFilter('click')}>Click</FilterChip>
       </div>
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
-      <FilterChip small active={paymentStatusFilter === 'all'} onClick={() => setPaymentStatusFilter('all')}>Hammasi</FilterChip>
-      <FilterChip small active={paymentStatusFilter === 'paid'} onClick={() => setPaymentStatusFilter('paid')}>To'langan</FilterChip>
-      <FilterChip small active={paymentStatusFilter === 'pending'} onClick={() => setPaymentStatusFilter('pending')}>Kutilmoqda</FilterChip>
+      <FilterChip small active={paymentStatusFilter === 'all'} onClick={() => setPaymentStatusFilter('all')}>{t.all}</FilterChip>
+      <FilterChip small active={paymentStatusFilter === 'paid'} onClick={() => setPaymentStatusFilter('paid')}>{t.paid}</FilterChip>
+      <FilterChip small active={paymentStatusFilter === 'pending'} onClick={() => setPaymentStatusFilter('pending')}>{t.pay_filter_pending}</FilterChip>
       </div>
       </div>
       
@@ -1775,7 +2025,7 @@ export default function App() {
       
       {currentOrders.length === 0 && (
         <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b', fontWeight: 700 }}>
-        Buyurtma topilmadi
+        Буюртма топилмади
         </div>
       )}
       
@@ -1786,9 +2036,9 @@ export default function App() {
     
     {page === 'products' && (
       <>
-      {/* Kategoriya tartibi */}
+      {/* Порядок категорий */}
       <Card>
-      <SectionTitle title="Kategoriya tartibi" subtitle="Menyu va miniappdagi ko'rinish tartibi" isMobile={isMobile} />
+      <SectionTitle title=t.cat_order subtitle=t.cat_order_sub isMobile={isMobile} />
       <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>
       {[...new Set(products.map(p => p.category).filter(Boolean))].map(cat => {
         const existing = categoryOrders.find(c => c.category === cat);
@@ -1799,7 +2049,7 @@ export default function App() {
           <input
           type="number"
           defaultValue={currentOrder}
-          placeholder="Tartib"
+          placeholder={t.order_placeholder}
           min={1}
           id={`catorder_${cat}`}
           style={{ width: 80, padding: '7px 10px', borderRadius: 10, border: '1px solid #e5e7eb', fontSize: 14, fontWeight: 600, outline: 'none' }}
@@ -1817,7 +2067,7 @@ export default function App() {
           }}
           style={{ padding: '7px 14px', fontSize: 13 }}
           >
-          Saqlash
+          Сохранить
           </Button>
           </div>
         );
@@ -1827,12 +2077,12 @@ export default function App() {
       
       <Card>
       <SectionTitle
-      title="Mahsulotlar"
-      subtitle={`${products.length} ta mahsulot`}
+      title={t.products_title}
+      subtitle={t.product_count(products.length)}
       isMobile={isMobile}
       right={
         <Button onClick={openAdd} style={{ display: 'flex', alignItems: 'center', gap: 8, width: isMobile ? '100%' : 'auto', justifyContent: 'center' }}>
-        <Plus size={16} /> Mahsulot qo'shish
+        <Plus size={16} /> {t.add_product}
         </Button>
       }
       />
@@ -1858,7 +2108,7 @@ export default function App() {
           fontWeight: 800, fontSize: 12,
         }}
         >
-        {product.active ? 'Aktiv' : 'Yashirin'}
+        {product.active ? t.active : t.hidden}
         </span>
         </div>
         <div style={{ marginTop: 14, fontSize: 26, fontWeight: 800, color: '#0f172a' }}>
@@ -1869,20 +2119,20 @@ export default function App() {
         onClick={() => openEdit(product)}
         style={{ flex: 1, background: '#e2e8f0', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, minWidth: isSmallMobile ? '100%' : 'auto' }}
         >
-        <Pencil size={16} /> Tahrirlash
+        <Pencil size={16} /> {t.edit}
         </Button>
         <Button
         onClick={() => toggleProduct(product)}
         style={{ flex: 1, background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, minWidth: isSmallMobile ? '100%' : 'auto' }}
         >
         {product.active ? <PowerOff size={16} /> : <Power size={16} />}
-        {product.active ? 'Yashirish' : 'Ochish'}
+        {product.active ? t.hide : t.show}
         </Button>
         <Button
         onClick={() => deleteProduct(product)}
         style={{ width: '100%', background: '#fee2e2', color: '#991b1b', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
         >
-        <Trash2 size={16} /> O'chirish
+        <Trash2 size={16} /> {t?.delete || 'Ўчириш'}
         </Button>
         </div>
         </div>
@@ -1896,47 +2146,47 @@ export default function App() {
     {page === 'stats' && (
       <div style={{ display: 'grid', gap: 22 }}>
       <Card>
-      <SectionTitle title="Umumiy statistika" subtitle="Barcha vaqtdagi ma'lumotlar" isMobile={isMobile} />
+      <SectionTitle title=t.all_stats subtitle=t.all_stats_sub isMobile={isMobile} />
       <div style={{ marginTop: 18, display: 'grid', gridTemplateColumns: statsGrid4, gap: 16 }}>
       <div style={{ padding: 18, borderRadius: 20, background: '#f8fafc' }}>
-      <div style={{ fontSize: 14, color: '#64748b' }}>Jami buyurtmalar</div>
+      <div style={{ fontSize: 14, color: '#64748b' }}>{t.total_orders}</div>
       <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800 }}>{allStatsData?.totalOrders ?? 0}</div>
       </div>
       <div style={{ padding: 18, borderRadius: 20, background: '#d1fae5' }}>
-      <div style={{ fontSize: 14, color: '#047857' }}>Yetkazilgan</div>
+      <div style={{ fontSize: 14, color: '#047857' }}>{t.total_delivered}</div>
       <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800 }}>{allStatsData?.deliveredOrders ?? 0}</div>
       </div>
       <div style={{ padding: 18, borderRadius: 20, background: '#f8fafc' }}>
-      <div style={{ fontSize: 14, color: '#64748b' }}>To'langan</div>
+      <div style={{ fontSize: 14, color: '#64748b' }}>{t.paid}</div>
       <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800 }}>{allStatsData?.paidOrders ?? 0}</div>
       </div>
       <div style={{ padding: 18, borderRadius: 20, background: '#fee2e2' }}>
-      <div style={{ fontSize: 14, color: '#b91c1c' }}>Bekor qilingan</div>
+      <div style={{ fontSize: 14, color: '#b91c1c' }}>{t.total_cancelled}</div>
       <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800 }}>{allStatsData?.cancelledOrders ?? 0}</div>
       </div>
       <div style={{ padding: 18, borderRadius: 20, background: '#eff6ff' }}>
-      <div style={{ fontSize: 14, color: '#1d4ed8' }}>Naqd tushum (jami)</div>
+      <div style={{ fontSize: 14, color: '#1d4ed8' }}>{t.cash_revenue}</div>
       <div style={{ marginTop: 10, fontSize: 22, fontWeight: 800 }}>{formatPrice(allStatsData?.cashRevenue ?? 0)}</div>
       </div>
       <div style={{ padding: 18, borderRadius: 20, background: '#0f172a' }}>
-      <div style={{ fontSize: 14, color: '#94a3b8' }}>Click tushum (jami)</div>
+      <div style={{ fontSize: 14, color: '#94a3b8' }}>{t.click_revenue}</div>
       <div style={{ marginTop: 10, fontSize: 22, fontWeight: 800, color: '#ffffff' }}>{formatPrice(allStatsData?.clickRevenue ?? 0)}</div>
       </div>
       <div style={{ padding: 18, borderRadius: 20, background: '#f0fdf4' }}>
-      <div style={{ fontSize: 14, color: '#047857' }}>Umumiy tushum</div>
+      <div style={{ fontSize: 14, color: '#047857' }}>{t.total_revenue}</div>
       <div style={{ marginTop: 10, fontSize: 22, fontWeight: 800 }}>{formatPrice(allStatsData?.totalRevenue ?? 0)}</div>
       </div>
       <div style={{ padding: 18, borderRadius: 20, background: '#fefce8' }}>
-      <div style={{ fontSize: 14, color: '#a16207' }}>To'lov kutilmoqda</div>
+      <div style={{ fontSize: 14, color: '#a16207' }}>{t.total_pending}</div>
       <div style={{ marginTop: 10, fontSize: 30, fontWeight: 800 }}>{allStatsData?.pendingPaymentOrders ?? 0}</div>
       </div>
       </div>
       </Card>
       
       <Card>
-      <SectionTitle title="Har kunlik statistika" subtitle="Kunlar bo'yicha tushum va zakazlar" isMobile={isMobile} />
+      <SectionTitle title=t.daily_stats subtitle=t.daily_stats_sub isMobile={isMobile} />
       {dailyStats.length === 0 ? (
-        <div style={{ marginTop: 18, color: '#64748b' }}>Hozircha kunlik statistika yo'q</div>
+        <div style={{ marginTop: 18, color: '#64748b' }}>{t.no_daily}</div>
       ) : (
         <>
         {/* Pagination tugmalari */}
@@ -1967,37 +2217,37 @@ export default function App() {
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 16, flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row' }}>
           <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: '#0f172a' }}>{day.dateLabel}</div>
           <div style={{ padding: '8px 12px', borderRadius: 999, background: '#eff6ff', color: '#1d4ed8', fontWeight: 800, fontSize: 13 }}>
-          {day.totalOrders} ta zakaz
+          Заказов: {day.totalOrders}
           </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: statsGrid4, gap: 14 }}>
           <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
-          <div style={{ fontSize: 13, color: '#64748b' }}>Kunlik jami zakaz</div>
+          <div style={{ fontSize: 13, color: '#64748b' }}>{t.daily_orders}</div>
           <div style={{ marginTop: 8, fontSize: 26, fontWeight: 800 }}>{day.totalOrders}</div>
           </div>
           <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
-          <div style={{ fontSize: 13, color: '#64748b' }}>Kunlik daromad</div>
+          <div style={{ fontSize: 13, color: '#64748b' }}>{t.daily_revenue}</div>
           <div style={{ marginTop: 8, fontSize: 26, fontWeight: 800 }}>{formatPrice(day.revenue)}</div>
           </div>
           <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
-          <div style={{ fontSize: 13, color: '#64748b' }}>Naqd tushum</div>
+          <div style={{ fontSize: 13, color: '#64748b' }}>{t.daily_cash}</div>
           <div style={{ marginTop: 8, fontSize: 26, fontWeight: 800 }}>{formatPrice(day.cashRevenue)}</div>
           </div>
           <div style={{ padding: 16, borderRadius: 18, background: '#f8fafc' }}>
-          <div style={{ fontSize: 13, color: '#64748b' }}>Click tushum</div>
+          <div style={{ fontSize: 13, color: '#64748b' }}>{t.daily_click}</div>
           <div style={{ marginTop: 8, fontSize: 26, fontWeight: 800 }}>{formatPrice(day.clickRevenue)}</div>
           </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: statsGrid4, gap: 12, marginTop: 14 }}>
-          <div style={{ padding: 14, borderRadius: 16, background: '#eff6ff', color: '#1d4ed8', fontWeight: 800 }}>Yangi: {day.newOrders}</div>
-          <div style={{ padding: 14, borderRadius: 16, background: '#fef3c7', color: '#b45309', fontWeight: 800 }}>Qabul qilindi: {day.acceptedOrders}</div>
-          <div style={{ padding: 14, borderRadius: 16, background: '#ede9fe', color: '#6d28d9', fontWeight: 800 }}>Tayyor: {day.readyOrders}</div>
-          <div style={{ padding: 14, borderRadius: 16, background: '#d1fae5', color: '#047857', fontWeight: 800 }}>Yetkazildi: {day.deliveredOrders}</div>
+          <div style={{ padding: 14, borderRadius: 16, background: '#eff6ff', color: '#1d4ed8', fontWeight: 800 }}>Новые: {day.newOrders}</div>
+          <div style={{ padding: 14, borderRadius: 16, background: '#fef3c7', color: '#b45309', fontWeight: 800 }}>Принято: {day.acceptedOrders}</div>
+          <div style={{ padding: 14, borderRadius: 16, background: '#ede9fe', color: '#6d28d9', fontWeight: 800 }}>Готово: {day.readyOrders}</div>
+          <div style={{ padding: 14, borderRadius: 16, background: '#d1fae5', color: '#047857', fontWeight: 800 }}>Доставлено: {day.deliveredOrders}</div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: statsGrid3, gap: 12, marginTop: 12 }}>
           <div style={{ padding: 14, borderRadius: 16, background: '#ecfdf5', color: '#047857', fontWeight: 800 }}>To'langan: {day.paidOrders}</div>
           <div style={{ padding: 14, borderRadius: 16, background: '#fffbeb', color: '#b45309', fontWeight: 800 }}>Kutilmoqda: {day.pendingPaymentOrders}</div>
-          <div style={{ padding: 14, borderRadius: 16, background: '#f8fafc', color: '#0f172a', fontWeight: 800 }}>Yetkazilgan daromad: {formatPrice(day.deliveredRevenue)}</div>
+          <div style={{ padding: 14, borderRadius: 16, background: '#f8fafc', color: '#0f172a', fontWeight: 800 }}>Выручка доставленных: {formatPrice(day.deliveredRevenue)}</div>
           </div>
           </div>
         ))}
@@ -2032,17 +2282,17 @@ export default function App() {
       {/* Header - scroll bo'lmaydi */}
       <div style={{ padding: isMobile ? '16px 18px 12px' : '22px 24px 14px', borderBottom: '1px solid #f1f5f9', flexShrink: 0 }}>
       <div style={{ fontSize: isMobile ? 20 : 24, fontWeight: 800, color: '#0f172a' }}>
-      {editingId ? 'Mahsulotni tahrirlash' : "Yangi mahsulot qo'shish"}
+      {editingId ? t.form_edit : t.form_add}
       </div>
       </div>
       
       {/* Kontent - scroll bo'ladi */}
       <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '14px 18px' : '16px 24px' }}>
       <div style={{ display: 'grid', gap: 12 }}>
-      <Input placeholder="ID / key" value={form.id} onChange={(e) => setForm((prev) => ({ ...prev, id: e.target.value }))} />
-      <Input placeholder="Mahsulot nomi" value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} />
-      <Input placeholder="Narxi" type="number" value={form.price} onChange={(e) => setForm((prev) => ({ ...prev, price: e.target.value }))} />
-      <Input placeholder="Kategoriya" value={form.category} onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))} />
+      <Input placeholder={t.id_placeholder} value={form.id} onChange={(e) => setForm((prev) => ({ ...prev, id: e.target.value }))} />
+      <Input placeholder={t.name_placeholder} value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} />
+      <Input placeholder={t.price_placeholder} type="number" value={form.price} onChange={(e) => setForm((prev) => ({ ...prev, price: e.target.value }))} />
+      <Input placeholder={t.category_placeholder} value={form.category} onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))} />
       <div style={{ display: 'flex', gap: 10, flexDirection: isSmallMobile ? 'column' : 'row' }}>
       <Button
       onClick={() => setImageMode('url')}
@@ -2058,7 +2308,7 @@ export default function App() {
       </Button>
       </div>
       {imageMode === 'url' ? (
-        <Input placeholder="Rasm URL" value={form.image} onChange={(e) => setForm((prev) => ({ ...prev, image: e.target.value }))} />
+        <Input placeholder={t.img_url_placeholder} value={form.image} onChange={(e) => setForm((prev) => ({ ...prev, image: e.target.value }))} />
       ) : (
         <input
         type="file"
@@ -2069,7 +2319,7 @@ export default function App() {
       )}
       {form.image ? (
         <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: 10, background: '#f8fafc' }}>
-        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>Rasm preview</div>
+        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>Предпросмотр изображения</div>
         <img src={form.image} alt="preview" style={{ width: '100%', maxHeight: 160, objectFit: 'contain', borderRadius: 10, background: '#ffffff' }} />
         </div>
       ) : null}
@@ -2079,11 +2329,11 @@ export default function App() {
       {/* Footer tugmalar - scroll bo'lmaydi */}
       <div style={{ padding: isMobile ? '12px 18px 16px' : '14px 24px 20px', borderTop: '1px solid #f1f5f9', flexShrink: 0, display: 'flex', justifyContent: 'flex-end', gap: 10, flexDirection: isSmallMobile ? 'column' : 'row' }}>
       <Button onClick={() => setShowForm(false)} style={{ background: '#e2e8f0', color: '#0f172a', width: isSmallMobile ? '100%' : 'auto' }}>
-      Bekor qilish
+      Отмена
       </Button>
       <Button onClick={saveProduct} style={{ width: isSmallMobile ? '100%' : 'auto' }}>
       <Check size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
-      Saqlash
+      Сохранить
       </Button>
       </div>
       </div>
