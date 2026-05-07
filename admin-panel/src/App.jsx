@@ -1066,7 +1066,7 @@ function PaymentInfoBox({ order, t = TRANSLATIONS.cy }) {
         }
         {location.hasCoords && (
           <div style={{ marginTop: 8 }}>
-          <InfoLine icon={MapPin} text=(t?.open_map || "Харитада очиш") link={location.link} />
+          <InfoLine icon={MapPin} text={t?.open_map || "Харитада очиш"} link={location.link} />
           </div>
         )}
         </div>
@@ -1169,7 +1169,7 @@ function PaymentInfoBox({ order, t = TRANSLATIONS.cy }) {
         }
         {location.hasCoords && (
           <div style={{ marginTop: 8 }}>
-          <InfoLine icon={MapPin} text=(t?.open_map || "Харитада очиш") link={location.link} />
+          <InfoLine icon={MapPin} text={t?.open_map || "Харитада очиш"} link={location.link} />
           </div>
         )}
         </div>
@@ -1945,7 +1945,7 @@ export default function App() {
     {page === 'dashboard' && (
       <>
       <Card>
-      <SectionTitle title=t.last_orders subtitle=t.last_orders_sub isMobile={isMobile} />
+      <SectionTitle title={t.last_orders} subtitle={t.last_orders}_sub isMobile={isMobile} />
       <div style={{ display: 'grid', gap: 16, marginTop: 18 }}>
       {filteredOrders.slice(0, 3).map((order) => (
         <OrderCard
@@ -2038,7 +2038,7 @@ export default function App() {
       <>
       {/* Порядок категорий */}
       <Card>
-      <SectionTitle title=t.cat_order subtitle=t.cat_order_sub isMobile={isMobile} />
+      <SectionTitle title={t.cat_order} subtitle={t.cat_order}_sub isMobile={isMobile} />
       <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>
       {[...new Set(products.map(p => p.category).filter(Boolean))].map(cat => {
         const existing = categoryOrders.find(c => c.category === cat);
@@ -2146,7 +2146,7 @@ export default function App() {
     {page === 'stats' && (
       <div style={{ display: 'grid', gap: 22 }}>
       <Card>
-      <SectionTitle title=t.all_stats subtitle=t.all_stats_sub isMobile={isMobile} />
+      <SectionTitle title={t.all_stats} subtitle={t.all_stats}_sub isMobile={isMobile} />
       <div style={{ marginTop: 18, display: 'grid', gridTemplateColumns: statsGrid4, gap: 16 }}>
       <div style={{ padding: 18, borderRadius: 20, background: '#f8fafc' }}>
       <div style={{ fontSize: 14, color: '#64748b' }}>{t.total_orders}</div>
@@ -2184,7 +2184,7 @@ export default function App() {
       </Card>
       
       <Card>
-      <SectionTitle title=t.daily_stats subtitle=t.daily_stats_sub isMobile={isMobile} />
+      <SectionTitle title={t.daily_stats} subtitle={t.daily_stats}_sub isMobile={isMobile} />
       {dailyStats.length === 0 ? (
         <div style={{ marginTop: 18, color: '#64748b' }}>{t.no_daily}</div>
       ) : (
