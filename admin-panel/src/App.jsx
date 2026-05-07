@@ -267,6 +267,13 @@ const TRANSLATIONS = {
 // Saved lang from localStorage
 const savedLang = localStorage.getItem('admin_lang') || 'cy';
 
+// Global til olish funksiyasi — standalone komponentlar uchun
+function getCurrentT() {
+  const lang = localStorage.getItem('admin_lang') || 'cy';
+  return TRANSLATIONS[lang] || TRANSLATIONS.cy;
+}
+
+
 function getStatusMap(t) {
   return {
     'Yangi buyurtma': { label: t.status_new, bg: '#dbeafe', color: '#1d4ed8' },
@@ -282,7 +289,7 @@ function formatPrice(value) {
   return new Intl.NumberFormat('uz-UZ').format(Number(value || 0)) + " сўм";
 }
 
-function formatDateTime(value, t = TRANSLATIONS.cy) {
+function formatDateTime(value, t = getCurrentT()) {
   if (!value) return t.no_time;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return t.no_time;
@@ -295,7 +302,7 @@ function formatDateTime(value, t = TRANSLATIONS.cy) {
   }).format(date);
 }
 
-function formatDateOnly(value, t = TRANSLATIONS.cy) {
+function formatDateOnly(value, t = getCurrentT()) {
   if (!value) return t.no_date;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return t.no_date;
@@ -365,7 +372,7 @@ function setFaviconBadge(count) {
   } catch {}
 }
 
-function startTabBlink(count, t = TRANSLATIONS.cy) {
+function startTabBlink(count, t = getCurrentT()) {
   newOrderCount = count;
   setFaviconBadge(count);
   
@@ -398,7 +405,7 @@ function requestNotificationPermission() {
   }
 }
 
-function showBrowserNotification(order, t = TRANSLATIONS.cy) {
+function showBrowserNotification(order, t = getCurrentT()) {
   if (!('Notification' in window)) return;
   if (Notification.permission !== 'granted') return;
   
@@ -426,17 +433,17 @@ function showBrowserNotification(order, t = TRANSLATIONS.cy) {
   } catch {}
 }
 
-function getPaymentMethodText(paymentMethod, t = TRANSLATIONS.cy) {
+function getPaymentMethodText(paymentMethod, t = getCurrentT()) {
   return paymentMethod === 'click' ? 'Click' : t.cash;
 }
 
-function getPaymentStatusText(paymentStatus, t = TRANSLATIONS.cy) {
+function getPaymentStatusText(paymentStatus, t = getCurrentT()) {
   if (paymentStatus === 'paid') return t.paid;
   if (paymentStatus === 'failed') return t.failed;
   return t.pending;
 }
 
-function getDeliveryTypeText(order, t = TRANSLATIONS.cy) {
+function getDeliveryTypeText(order, t = getCurrentT()) {
   if (order?.deliveryType === 'pickup') return t.pickup;
   return t.delivery;
 }
@@ -630,7 +637,7 @@ function Badge({ status, statusMap: sm }) {
   );
 }
 
-function PaymentBadge({ paymentStatus, paymentMethod, t = TRANSLATIONS.cy }) {
+function PaymentBadge({ paymentStatus, paymentMethod, t = getCurrentT() }) {
   // Наличные + pending bo'lsa badge ko'rsatilmaydi
   const isCash = !paymentMethod || paymentMethod === 'cash';
   const isPending = !paymentStatus || paymentStatus === 'pending';
@@ -660,7 +667,7 @@ function PaymentBadge({ paymentStatus, paymentMethod, t = TRANSLATIONS.cy }) {
   );
 }
 
-function MethodBadge({ paymentMethod, t = TRANSLATIONS.cy }) {
+function MethodBadge({ paymentMethod, t = getCurrentT() }) {
   const isClick = paymentMethod === 'click';
   return (
     <span
@@ -739,7 +746,7 @@ function InfoLine({ icon: Icon, text, link }) {
 }
 
 // Yo'l haqi belgilash komponenti (faqat delivery)
-function DeliveryFeeBox({ order, onDeliveryFeeUpdate, t = TRANSLATIONS.cy }) {
+function DeliveryFeeBox({ order, onDeliveryFeeUpdate, t = getCurrentT() }) {
   const [fee, setFee] = React.useState(order.deliveryFee ? String(order.deliveryFee) : '');
   const [saving, setSaving] = React.useState(false);
   const [saved, setSaved] = React.useState(order.deliveryFee > 0); // refresh da ham to'g'ri ko'rinadi
@@ -817,7 +824,7 @@ function DeliveryFeeBox({ order, onDeliveryFeeUpdate, t = TRANSLATIONS.cy }) {
 }
 
 // Тўлов маълумотлари ko'rsatish komponenti
-function PaymentInfoBox({ order, t = TRANSLATIONS.cy }) {
+function PaymentInfoBox({ order, t = getCurrentT() }) {
   const isClick = order.paymentMethod === 'click';
   const isPaid = order.paymentStatus === 'paid';
   const isFailed = order.paymentStatus === 'failed';
@@ -940,6 +947,7 @@ function PaymentInfoBox({ order, t = TRANSLATIONS.cy }) {
     hideActions = false,
     isMobile = false,
     isTablet = false,
+    t = getCurrentT(),
   }) {
     const items = typeof order.cartText === 'string'
     ? order.cartText
@@ -1275,7 +1283,7 @@ function PaymentInfoBox({ order, t = TRANSLATIONS.cy }) {
   };
 }
 
-function buildDailyStats(orders, t = TRANSLATIONS.cy) {
+function buildDailyStats(orders, t = getCurrentT()) {
   const map = new Map();
   for (const order of orders) {
     const key = getDateKey(order.createdAt);
@@ -1324,7 +1332,7 @@ function buildDailyStats(orders, t = TRANSLATIONS.cy) {
   return Array.from(map.values()).sort((a, b) => b.dateKey.localeCompare(a.dateKey));
 }
 
-function Pagination({ currentPage, totalPages, onPageChange, isMobile = false, t = TRANSLATIONS.cy }) {
+function Pagination({ currentPage, totalPages, onPageChange, isMobile = false, t = getCurrentT() }) {
   if (totalPages <= 1) return null;
   const pages = [];
   const start = Math.max(1, currentPage - (isMobile ? 1 : 2));
