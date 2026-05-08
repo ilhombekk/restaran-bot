@@ -1650,6 +1650,36 @@ function buildAdminText(order) {
                     ]).resize()
                 );
             }
+
+            // Qo'lda telefon kiritish (phone)
+            if (ctx.session.step === 'phone') {
+                const phone = text.replace(/\D/g, '');
+                if (phone.length < 9) {
+                    return ctx.reply(
+                        "Telefon raqam noto'g'ri. Iltimos qaytadan kiriting yoki tugmani bosing.",
+                        Markup.keyboard([
+                            [Markup.button.contactRequest('📱 Telefon raqamni yuborish')],
+                            ['⬅️ Ortga']
+                        ]).resize()
+                    );
+                }
+                ctx.session.orderData.phone = '+' + phone;
+                if (ctx.session.orderData.deliveryType === 'pickup') {
+                    return finalizeOrder(
+                        ctx,
+                        { text: "O'zi olib ketadi" },
+                        "O'zi olib ketadi"
+                    );
+                }
+                ctx.session.step = 'address';
+                return ctx.reply(
+                    [
+                        '📍 Manzilni yuboring yoki yozing',
+                        '',
+                        'Joylashuvingizni yuboring yoki manzilingizni matn shaklida kiriting.'
+                    ].join('\n')
+                );
+            }
             
             if (ctx.session.step === 'feedback') {
                 if (!text || text === '❌ Bekor qilish') {
